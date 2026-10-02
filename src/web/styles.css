@@ -46,6 +46,14 @@ button.box:hover { background:var(--hover); }
 .dayview { border:1.5px solid var(--frame); border-radius:8px; background:var(--panel); padding:12px 14px 18px; }
 .tasks { position:sticky; top:14px; align-self:start; max-height:calc(100vh - 28px); display:flex; flex-direction:column; border:1.5px solid var(--frame); border-radius:8px; background:var(--panel); }
 .tasks-inner { overflow:auto; padding:0 16px 16px; }
+.tasks-top { padding:12px 16px 0; flex:none; }
+.quickadd { display:flex; align-items:flex-start; gap:10px; border-bottom:1.5px solid var(--ink); padding:7px 2px; }
+.quickadd:focus-within { border-color:var(--accent); }
+.quickadd > svg { width:18px; height:18px; color:var(--muted); flex:none; margin-top:3px; }
+.quickadd textarea { flex:1; border:0; background:transparent; color:var(--ink); font:inherit; font-size:16px; line-height:1.4; outline:none; min-width:0; resize:none; height:24px; max-height:180px; overflow:auto; padding:0; }
+.quickadd textarea::placeholder { color:var(--muted); }
+.quickadd .busy { font-family:var(--hand); font-size:21px; font-weight:600; color:var(--accent); white-space:nowrap; line-height:1; }
+.quickadd.is-busy textarea { opacity:.45; }
 .loading { font-family:var(--hand); font-size:26px; color:var(--muted); }
 
 /* ---------- Header ---------- */
@@ -208,6 +216,8 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .card.static { cursor:pointer; }
 .card.waiting { border-style:dashed; background:transparent; }
 .card.waiting .t { color:var(--muted); }
+@keyframes fresh { from { background-color:var(--hl); } to { background-color:var(--card); } }
+.card.fresh { animation:fresh 3s ease-out; }
 .card.done .t { text-decoration:line-through; color:var(--muted); }
 .card.overdue { border-left:3px solid var(--red); }
 .card.dragging { opacity:.35; }
@@ -393,6 +403,7 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
     position:absolute; left:0; right:0; bottom:0; top:auto; z-index:30; height:64px; max-height:none; display:flex; flex-direction:column;
     border:0; border-top:1.5px solid var(--frame); border-radius:22px 22px 0 0; box-shadow:0 -8px 26px rgba(0,0,0,.14);
   }
+  .tasks.drawer .tasks-top { padding:0 16px; }
   .tasks.drawer .tasks-inner { flex:1; min-height:0; overflow:auto; padding:0 16px 24px; }
   .handle {
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; flex:none; height:62px;

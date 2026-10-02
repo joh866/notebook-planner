@@ -1,4 +1,5 @@
 import type {
+  AddResult,
   AgendaView,
   CategoryView,
   ConditionAnswer,
@@ -82,6 +83,8 @@ export const api = {
   undo: (token: string) => send<{ ok: true }>('POST', `/api/undo/${token}`),
   /** Drag and drop. Positions are minutes on the shown day, in this device's zone. */
   drop: (body: DropInput) => send<Changed<DropResult>>('POST', `/api/drops?${tz()}`, body),
+  /** The add box. The server sorts the text with the AI (or a simple guess) and adds it all. */
+  add: (text: string) => send<Changed<AddResult>>('POST', `/api/add?${tz()}`, { text }),
 
   setTaskDone: (id: string, done: boolean) =>
     send<Changed>('PATCH', `/api/tasks/${id}`, { doneAt: done ? new Date().toISOString() : null }),

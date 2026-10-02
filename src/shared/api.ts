@@ -222,6 +222,9 @@ export const DropInputSchema = z.discriminatedUnion('action', [
 ]);
 export type DropInput = z.infer<typeof DropInputSchema>;
 
+/** The add box (spec §11): anything from one line to a whole pasted list. */
+export const AddInputSchema = z.strictObject({ text: z.string().trim().min(1).max(50_000) });
+
 export const SettingsPatchSchema = z.strictObject({
   wakeTime: ClockSchema,
   bedTime: ClockSchema,
@@ -258,6 +261,25 @@ export interface ConditionAnswer {
 /** POST /api/drops. `routine` is set for placeRoutine, so the message can say how it repeats. */
 export interface DropResult {
   routine: { title: string; repeat: 'daily' | 'weekly'; repeatDays: number[] | null; repeatEvery: number; start: string } | null;
+}
+
+/** One thing the add box made, for the result message. */
+export type AddedItem =
+  | { kind: 'task'; id: string; title: string; window: Window | 'overdue' }
+  /** An event with no time: a task in that day's Sometime lane. */
+  | { kind: 'sometime'; id: string; title: string; date: string }
+  | { kind: 'event'; id: string; title: string; date: string; startAt: string }
+  | { kind: 'routine'; id: string; title: string }
+  | { kind: 'class'; id: string; title: string };
+
+/** POST /api/add. */
+export interface AddResult {
+  added: AddedItem[];
+  /** How many chunks the text was split into, and how many fell back to the local guess. */
+  chunks: number;
+  fellBack: number;
+  /** Why the first failed chunk failed. */
+  reason: string | null;
 }
 
 export interface StepView {

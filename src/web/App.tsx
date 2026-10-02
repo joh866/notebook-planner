@@ -3,7 +3,8 @@ import { DateTime } from 'luxon';
 import { addDays } from '../core/day';
 import { lookForHour } from '../core/look';
 import { minutesOnDay } from '../core/time';
-import type { DailyRow, DropInput, StepView, TaskCard } from '../shared/api';
+import type { AddResult, DailyRow, DropInput, StepView, TaskCard } from '../shared/api';
+import { addMessage } from './addMessage';
 import { categoryName, catName, nextColor } from './cats';
 import { ClassDialog, classTitle } from './ClassDialog';
 import { api, loadAll, type Changed, type Loaded } from './client';
@@ -56,6 +57,8 @@ export function App() {
   /** The class dialog: a class id to edit, or 'new'. */
   const [classEdit, setClassEdit] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  /** Cards the add box just made, which flash briefly (spec §11, "After adding"). */
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
   const phone = usePhone();
   const [drawer, setDrawer] = useState<DrawerStop>('peek');
   /** The drawer's stop before a drag closed it, to reopen afterward. */
@@ -366,6 +369,28 @@ export function App() {
     saveNotes: (taskId, notes) => void change(() => api.patchTask(taskId, { notes }), null),
   };
 
+  /** The add box: everything is added right away, with one Undo (spec §11). */
+  const addText = async (text: string): Promise<boolean> => {
+    let r: Changed<AddResult>;
+    try {
+      r = await api.add(text);
+    } catch (e) {
+      say(e instanceof Error ? `Couldn’t add that: ${e.message}` : 'Couldn’t add that.');
+      return false;
+    }
+    await reload();
+    const { today, zone } = data!.day;
+    say(addMessage(r.item, today, zone, WINDOW_LABEL), undoAction(r.undo), 9000);
+    const cards = r.item.added.filter((a) => a.kind === 'task' || a.kind === 'sometime').map((a) => a.id);
+    if (!cards.length) return true;
+    setFilter('all');
+    setFresh(new Set(cards));
+    setTimeout(() => setFresh(new Set()), 3500);
+    if (phone && drawer === 'peek') setDrawer('half');
+    requestAnimationFrame(() => document.querySelector(`.card[data-id="${cards[0]}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    return true;
+  };
+
   const pickCategory = (t: TaskCard, id: string) =>
     void change(() => api.patchTask(t.id, { categoryId: id }), `Moved “${t.title}” to ${catName(data!.categories, id)}.`);
   const newCategory = async (t: TaskCard, raw: string) => {
@@ -497,6 +522,8 @@ export function App() {
             actions={actions}
             drag={{ begin: drag.begin, over: drag.view?.target?.kind === 'tasks' }}
             drawer={phone ? { stop: drawer, onStop: setDrawer } : undefined}
+            onAdd={addText}
+            fresh={fresh}
           />
         )}
       </div>

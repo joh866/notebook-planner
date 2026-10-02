@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { blockLength } from '../core/length';
 import type { CategoryView, DailyRow, DayView, StepView, TaskCard } from '../shared/api';
 import { catName, catStyle } from './cats';
@@ -38,6 +38,10 @@ interface Props {
   drag: { begin: BeginDrag; over: boolean };
   /** At phone width the panel is a pull-up drawer (spec §5, "Phone"). */
   drawer?: { stop: DrawerStop; onStop: (s: DrawerStop) => void };
+  /** The add box (spec §9, §11). Resolves true when the text was added, which clears the box. */
+  onAdd: (text: string) => Promise<boolean>;
+  /** Cards just added, which flash briefly. */
+  fresh: Set<string>;
 }
 
 const GROUPS = [
@@ -53,17 +57,20 @@ const GROUPS = [
 /** Group names by window, for messages like "Moved it to Soon." */
 export const WINDOW_LABEL: Record<string, string> = Object.fromEntries(GROUPS);
 
-export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions, drag, drawer }: Props) {
+export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions, drag, drawer, onAdd, fresh }: Props) {
   const pass = (t: TaskCard) => filter === 'all' || t.categoryId === filter;
   const chips = [{ id: 'all', name: 'All' }, ...categories.filter((c) => c.id !== 'routine')];
   const card = (t: TaskCard) => (
-    <Card key={t.id} t={t} day={day} categories={categories} open={openId === t.id} onToggle={() => onToggleOpen(t.id)} actions={actions} begin={drag.begin} />
+    <Card key={t.id} t={t} day={day} categories={categories} open={openId === t.id} fresh={fresh.has(t.id)} onToggle={() => onToggleOpen(t.id)} actions={actions} begin={drag.begin} />
   );
   const done = day.groups.done.filter(pass);
 
   return (
     <aside className={`tasks${drawer ? ' drawer' : ''}${drag.over ? ' drop-on' : ''}`} aria-label="Tasks" data-drop="tasks">
       {drawer && <DrawerHandle day={day} {...drawer} />}
+      <div className="tasks-top">
+        <AddBox onAdd={onAdd} />
+      </div>
       <div className="tasks-inner">
         <div className="filters">
           {chips.map((c) => (
@@ -303,17 +310,78 @@ interface CardProps {
   day: DayView;
   categories: CategoryView[];
   open: boolean;
+  fresh: boolean;
   onToggle: () => void;
   actions: TaskActions;
   begin: BeginDrag;
 }
 
-function Card({ t, day, categories, open, onToggle, actions, begin }: CardProps) {
+/**
+ * One text box that grows as you type and takes a whole pasted list. Enter adds, Shift+Enter is a
+ * new line, and it says "Sorting…" while the AI works.
+ */
+function AddBox({ onAdd }: { onAdd: (text: string) => Promise<boolean> }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(180, Math.ceil(el.scrollHeight))}px`;
+    el.style.overflowY = el.scrollHeight > 180 ? 'auto' : 'hidden';
+  }, [text]);
+
+  // The box is disabled while sorting, so focus comes back afterward, ready for the next thing.
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (busy || !refocus.current) return;
+    refocus.current = false;
+    ref.current?.focus({ preventScroll: true });
+  }, [busy]);
+
+  const submit = async () => {
+    const v = text.trim();
+    if (!v || busy) return;
+    refocus.current = document.activeElement === ref.current;
+    setBusy(true);
+    try {
+      if (await onAdd(v)) setText('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`quickadd${busy ? ' is-busy' : ''}`}>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
+      <textarea
+        ref={ref}
+        rows={1}
+        value={text}
+        disabled={busy}
+        placeholder="Add anything, or paste a whole list"
+        aria-label="Add something"
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
+      />
+      {busy && <span className="busy" role="status">Sorting…</span>}
+    </div>
+  );
+}
+
+function Card({ t, day, categories, open, fresh, onToggle, actions, begin }: CardProps) {
   const decide = t.window === 'decide';
   const overdue = t.effectiveWindow === 'overdue';
   // Waiting and decision items, and finished tasks, don't go on the schedule.
   const canDrag = !decide && t.window !== 'waiting' && !t.doneAt;
-  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue', open && 'open', !canDrag && 'static']
+  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue', open && 'open', !canDrag && 'static', fresh && 'fresh']
     .filter(Boolean).join(' ');
   const due = deadlineOn(t, day.zone);
   const { when, rest } = detailBits(t, day);
@@ -322,6 +390,7 @@ function Card({ t, day, categories, open, onToggle, actions, begin }: CardProps)
   return (
     <div
       className={cls}
+      data-id={t.id}
       style={catStyle(categories, t.categoryId)}
       tabIndex={0}
       aria-expanded={open}

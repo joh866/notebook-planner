@@ -7,6 +7,8 @@ import { AgendaDaysSchema, DaySchema, MonthSchema, SettingsPatchSchema, ZoneSche
 import type { Health } from '../shared/schemas';
 import type { Db } from './db/client';
 import * as t from './db/schema';
+import { registerAdds } from './adds';
+import { anthropicSorter, type SortChunk } from './ai';
 import { registerAnswers } from './answers';
 import { registerDrops } from './drops';
 import { notFound, readBody, registerResources, type Run } from './resources';
@@ -18,13 +20,15 @@ export interface AppOptions {
   /** The current moment. Tests pass a fixed one. */
   now?: () => DateTime;
   undo?: UndoStore;
+  /** Sorts add-box text with the AI. Tests pass a fake. */
+  sort?: SortChunk;
 }
 
 /**
  * The API. Reads take `?tz=` (the device's time zone), which is used when the time zone setting
  * is "auto". Without it, the home zone is used.
  */
-export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore() }: AppOptions) {
+export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter() }: AppOptions) {
   const app = new Hono();
 
   /** Runs a change in one transaction and keeps its inverse for Undo. */
@@ -77,6 +81,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   registerResources(app, db, run);
   registerAnswers(app, run, now);
   registerDrops(app, db, run, now);
+  registerAdds(app, db, run, now, sort);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {
