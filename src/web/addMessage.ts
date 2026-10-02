@@ -26,9 +26,11 @@ export function addMessage(r: AddResult, today: string, zone: string, labels: Re
   if (n === 1) {
     const a = r.added[0]!;
     switch (a.kind) {
-      case 'task':
-        what = `Added “${a.title}” to ${labels[a.window] ?? a.window}.`;
+      case 'task': {
+        const at = a.penciled ? momentOn(a.penciled, zone) : null;
+        what = `Added “${a.title}” to ${labels[a.window] ?? a.window}${at ? `, penciled in ${relWord(today, at.date)} at ${fmtTime(at.min)}` : ''}.`;
         break;
+      }
       case 'sometime':
         what = `Added “${a.title}” to Sometime ${relWord(today, a.date)}.`;
         break;
@@ -47,7 +49,8 @@ export function addMessage(r: AddResult, today: string, zone: string, labels: Re
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
     const parts = ['task', 'routine', 'event', 'class'].filter((k) => counts.has(k)).map((k) => plural(counts.get(k)!, k));
-    what = `Added ${n} items: ${joinAnd(parts)}.`;
+    const penciled = r.added.filter((a) => a.kind === 'task' && a.penciled).length;
+    what = `Added ${n} items: ${joinAnd(parts)}.${penciled ? ` Penciled in ${penciled}.` : ''}`;
   }
   return `${what} ${sortedBy(r)}`;
 }

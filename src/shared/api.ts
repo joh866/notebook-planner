@@ -263,9 +263,30 @@ export interface DropResult {
   routine: { title: string; repeat: 'daily' | 'weekly'; repeatDays: number[] | null; repeatEvery: number; start: string } | null;
 }
 
+export interface CapacityView {
+  level: 'heads-up' | 'tight';
+  /** Minutes of work due by the deadline, and of free time before it. */
+  work: number;
+  free: number;
+  dueAt: string | null;
+  dueDate: string | null;
+}
+
+/** POST /api/plan (spec §12). Penciled blocks for the rest of the day were lifted, then these placed. */
+export interface PlanResult {
+  date: string;
+  placed: { taskId: string; title: string; startAt: string; reason: string }[];
+  lifted: number;
+  /** Free minutes left on the day before planning, to say why nothing fit. */
+  free: number;
+}
+
+export const PlanInputSchema = z.strictObject({ date: DaySchema });
+
 /** One thing the add box made, for the result message. */
 export type AddedItem =
-  | { kind: 'task'; id: string; title: string; window: Window | 'overdue' }
+  /** `penciled` is the block's start when automatic scheduling placed it. */
+  | { kind: 'task'; id: string; title: string; window: Window | 'overdue'; penciled?: string | null }
   /** An event with no time: a task in that day's Sometime lane. */
   | { kind: 'sometime'; id: string; title: string; date: string }
   | { kind: 'event'; id: string; title: string; date: string; startAt: string }
@@ -463,6 +484,8 @@ export interface DayView extends ViewContext, DaySchedule {
     overdue: { taskId: string; name: string }[];
     nextDeadline: { taskId: string; name: string; dueAt: string | null; dueDate: string | null } | null;
   };
+  /** The capacity warning under the header (spec §6), when the work due soon is more than half the free time before it. */
+  capacity: CapacityView | null;
 }
 
 export interface WeekView extends ViewContext {

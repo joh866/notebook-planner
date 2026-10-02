@@ -1,12 +1,13 @@
 import { DateTime } from 'luxon';
 import { DAY_START_HOUR, dayOf, diffDays, weekday } from '../core/day';
 import { minutesOnDay, parseClock } from '../core/time';
+import { DAYS, fmtTime, relWord } from '../core/words';
+
+export { dueLabel, fmtTime, relWord } from '../core/words';
 
 // Words and labels for the UI. Minutes are wall-clock minutes after a day's midnight (over 1440
 // after midnight), as the API returns them.
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const SHORT_DAYS = DAYS.map((d) => d.slice(0, 3));
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -15,16 +16,6 @@ export function joinAnd(a: string[]): string {
   if (a.length < 2) return a.join('');
   if (a.length === 2) return `${a[0]} and ${a[1]}`;
   return `${a.slice(0, -1).join(', ')}, and ${a[a.length - 1]}`;
-}
-
-/** "9am", "8:15pm". */
-export function fmtTime(m: number): string {
-  m = ((m % 1440) + 1440) % 1440;
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  const ap = h < 12 ? 'am' : 'pm';
-  const h12 = h % 12 || 12;
-  return mm ? `${h12}:${String(mm).padStart(2, '0')}${ap}` : `${h12}${ap}`;
 }
 
 /** "11–12:20pm", "1:30–2:50pm", "11pm–12am". */
@@ -55,24 +46,6 @@ const parse = (date: string) => DateTime.fromFormat(date, 'yyyy-MM-dd');
 export const longDate = (date: string) => parse(date).toFormat('cccc, LLLL d');
 /** "Fri, Oct 2". */
 export const shortDate = (date: string) => parse(date).toFormat('ccc, LLL d');
-
-/** "today", "tomorrow", "yesterday", "Tuesday", "last Tuesday", or "Oct 14". */
-export function relWord(today: string, date: string): string {
-  const n = diffDays(today, date);
-  if (n === 0) return 'today';
-  if (n === 1) return 'tomorrow';
-  if (n === -1) return 'yesterday';
-  if (n > 1 && n < 7) return DAYS[weekday(date)]!;
-  if (n < -1 && n > -7) return `last ${DAYS[weekday(date)]}`;
-  return parse(date).toFormat('LLL d');
-}
-
-/** The due chip's words: "today 2pm", "Tue 2pm", "Fri", "Oct 14, 11am". */
-export function dueLabel(today: string, date: string, atMin: number | null): string {
-  const n = diffDays(today, date);
-  const day = n === 0 ? 'today' : n === 1 ? 'tomorrow' : Math.abs(n) < 7 && n !== -1 ? SHORT_DAYS[weekday(date)]! : relWord(today, date);
-  return atMin == null ? day : `${day}${Math.abs(n) >= 7 ? ',' : ''} ${fmtTime(atMin)}`;
-}
 
 /** Where a UTC moment falls in `zone`: its planner day and minutes on that day. */
 export function momentOn(isoUtc: string, zone: string): { date: string; min: number } {
@@ -125,4 +98,35 @@ export function aroundLabel(label: string | null, m: number): string {
 export function repeatWords(r: { repeat: 'daily' | 'weekly'; repeatDays: number[] | null; repeatEvery: number }): string {
   if (r.repeat === 'daily' || !r.repeatDays?.length) return 'every day';
   return `every ${r.repeatEvery > 1 ? 'other ' : ''}${joinAnd(r.repeatDays.map((d) => DAYS[d]!))}`;
+}
+
+/** "5h", "4h 30m", "45m", rounded to 15 minutes. */
+export function fmtHours(m: number): string {
+  const r = Math.round(m / 15) * 15;
+  const h = Math.floor(r / 60);
+  const mm = r % 60;
+  return h ? `${h}h${mm ? ` ${mm}m` : ''}` : `${mm}m`;
+}
+
+/**
+ * The capacity warning (spec §6): "Tight: about 5h of work is due by Tuesday at 2pm, and you have
+ * about 4h of free time before then."
+ */
+export function capacityText(c: { level: 'heads-up' | 'tight'; work: number; free: number; dueAt: string | null; dueDate: string | null }, today: string, zone: string): string {
+  const at = deadlineOn(c, zone)!;
+  const when = `${relWord(today, at.date)}${at.min != null ? ` at ${fmtTime(at.min)}` : ''}`;
+  return `${c.level === 'tight' ? 'Tight' : 'Heads up'}: about ${fmtHours(c.work)} of work is due by ${when}, and you have about ${fmtHours(c.free)} of free time before then.`;
+}
+
+/** "Penciled in 4 tasks for today." and the like, after the Plan button (spec §12). */
+export function planMessage(r: { date: string; placed: { title: string; startAt: string }[]; lifted: number; free: number }, today: string, zone: string): string {
+  const day = relWord(today, r.date);
+  const n = r.placed.length;
+  if (n === 1) {
+    const at = momentOn(r.placed[0]!.startAt, zone);
+    return `Penciled in “${r.placed[0]!.title}” ${day} at ${fmtTime(at.min)}.`;
+  }
+  if (n > 1) return `Penciled in ${n} tasks for ${day}.`;
+  if (r.free < 15) return `There’s no free time left ${day}.`;
+  return 'Nothing to plan. Everything is scheduled, waiting, or needs a decision.';
 }

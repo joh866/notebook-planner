@@ -11,6 +11,7 @@ import { registerAdds } from './adds';
 import { anthropicSorter, type SortChunk } from './ai';
 import { registerAnswers } from './answers';
 import { registerDrops } from './drops';
+import { autoPencil, registerPlan } from './plan';
 import { notFound, readBody, registerResources, type Run } from './resources';
 import { Change, UndoStore, applyUndo, findRows, whereKey } from './undo';
 import { agendaView, dayView, getSettings, monthView, rolloverInputs, weekView } from './views';
@@ -82,6 +83,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   registerAnswers(app, run, now);
   registerDrops(app, db, run, now);
   registerAdds(app, db, run, now, sort);
+  registerPlan(app, db, run, now);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {
@@ -99,7 +101,10 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
         tx.insert(t.sometime).values(entry).onConflictDoUpdate({ target: t.sometime.taskId, set: entry }).run();
         if (!existing.length) change.created('sometime', [entry]);
       }
-      return { today: input.today, moved: result.sometime.map((s) => s.taskId) };
+      const moved = result.sometime.map((s) => s.taskId);
+      // With automatic scheduling on, rolled-over tasks are penciled in too (spec §10, "Rollover").
+      autoPencil(db, tx, change, now(), zone, moved);
+      return { today: input.today, moved };
     }));
   });
 

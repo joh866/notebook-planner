@@ -2,9 +2,10 @@ import { DateTime } from 'luxon';
 import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
 import { blockLength } from '../core/length';
+import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask } from '../core/planner';
 import { classesOn, routineOccursOn, slotOn } from '../core/recurrence';
 import { streak } from '../core/streak';
-import { clockOnDay, minutesOnDay, resolveZone } from '../core/time';
+import { clockOnDay, minutesOnDay, parseClock, resolveZone } from '../core/time';
 import { deadlineDay, deadlineMoment, dueTone, effectiveWindow, isOverdue } from '../core/urgency';
 import type {
   AgendaView,
@@ -204,8 +205,57 @@ function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number]): TaskCard {
   };
 }
 
+/** Wall-clock minutes on a day for a local "HH:mm": before 4am is that day's night. */
+const dayMinute = (hhmm: string) => {
+  const m = parseClock(hhmm);
+  return m < 4 * 60 ? m + 1440 : m;
+};
+
+/** Everything the planner (spec §12) reads, from one load. */
+function planning(ctx: Ctx) {
+  const s = ctx.data.settings;
+  const wake = dayMinute(s.wakeTime);
+  const bed = dayMinute(s.bedTime);
+  const nowMin = minutesOnDay(ctx.now, ctx.today, ctx.zone);
+  const clock: PlanClock = { now: ctx.now, today: ctx.today, zone: ctx.zone, homeZone: ctx.homeZone };
+  const ends = (b: Rows<typeof t.blocks>[number]) => utc(b.startAt).plus({ minutes: b.durationMinutes });
+
+  /** Each day's free window and busy time. Blocks in `skip` count as free. */
+  const day = (date: string, skip: Set<string> = new Set()): DayFree => ({
+    date, ...freeWindow(date, ctx.today, nowMin, wake, bed), busy: busyOf(scheduleFor(ctx, date).schedule, skip),
+  });
+
+  /** Tasks as the planner sees them. A task is scheduled when it has a block that hasn't ended, other than those in `skip`. */
+  const tasks = (skip: Set<string> = new Set()): PlanTask[] => ctx.data.tasks.map((task) => {
+    const some = ctx.data.sometime.find((x) => x.taskId === task.id);
+    return {
+      id: task.id, title: task.title, window: task.window, dueAt: task.dueAt, dueDate: task.dueDate,
+      estLow: task.estLow, estHigh: task.estHigh, sittingMinutes: task.sittingMinutes, sessionMinutes: task.sessionMinutes,
+      doneAt: task.doneAt, steps: stepsOf(ctx, task.id),
+      sometime: some ? { date: some.date, rolledFrom: some.rolledFrom } : null,
+      scheduled: ctx.data.blocks.some((b) => b.taskId === task.id && !skip.has(b.id) && ends(b) > ctx.now),
+    };
+  });
+
+  /** Minutes already on the schedule for each task from now on: time set aside for it. */
+  const setAside = () => {
+    const out = new Map<string, number>();
+    for (const b of ctx.data.blocks) {
+      if (!b.taskId || utc(b.startAt) < ctx.now) continue;
+      out.set(b.taskId, (out.get(b.taskId) ?? 0) + b.durationMinutes);
+    }
+    return out;
+  };
+
+  return { clock, day, tasks, setAside, blocks: ctx.data.blocks, zone: ctx.zone, today: ctx.today, settings: s };
+}
+
+/** What the Plan button and automatic scheduling read (spec §12). */
+export const planInputs = (db: Db, now: DateTime, deviceZone?: string) => planning(context(db, now, deviceZone));
+
 export function dayView(db: Db, now: DateTime, date: string | undefined, deviceZone?: string): DayView {
   const ctx = context(db, now, deviceZone);
+  const plan = planning(ctx);
   const day = date ?? ctx.today;
   const cards = new Map(ctx.data.tasks.map((task) => [task.id, taskCard(ctx, task)]));
   const g = groupTasks(ctx.data.tasks, now, ctx.zone, ctx.homeZone);
@@ -236,6 +286,7 @@ export function dayView(db: Db, now: DateTime, date: string | undefined, deviceZ
       overdue: g.overdue.map((task) => ({ taskId: task.id, name: name(task) })),
       nextDeadline: next ? { taskId: next.id, name: name(next), dueAt: next.dueAt, dueDate: next.dueDate } : null,
     },
+    capacity: capacity(plan.tasks(), plan.clock, (d) => plan.day(d), plan.setAside()),
   };
 }
 

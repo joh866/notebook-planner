@@ -12,6 +12,15 @@ describe('addMessage', () => {
     expect(msg(result([{ kind: 'task', id: '1', title: 'Get razor', window: 'week' }]))).toBe('Added “Get razor” to This week. Sorted by AI.');
   });
 
+  it('says when automatic scheduling penciled it in', () => {
+    expect(msg(result([{ kind: 'task', id: '1', title: 'Get razor', window: 'week', penciled: '2026-10-02T21:00:00Z' }])))
+      .toBe('Added “Get razor” to This week, penciled in today at 4pm. Sorted by AI.');
+    expect(msg(result([
+      { kind: 'task', id: '1', title: 'A', window: 'near', penciled: '2026-10-02T21:00:00Z' },
+      { kind: 'task', id: '2', title: 'B', window: 'soon', penciled: null },
+    ]))).toBe('Added 2 items: 2 tasks. Penciled in 1. Sorted by AI.');
+  });
+
   it('says when a single event is, and where a Sometime task went', () => {
     expect(msg(result([{ kind: 'event', id: '1', title: 'Dinner', date: '2026-10-02', startAt: '2026-10-03T00:00:00Z' }])))
       .toBe('Added “Dinner” today at 7pm. Sorted by AI.');

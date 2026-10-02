@@ -10,8 +10,8 @@ import { ClassDialog, classTitle } from './ClassDialog';
 import { api, loadAll, type Changed, type Loaded } from './client';
 import { useDrag, type DragItem, type DropTarget, type Geometry } from './drag';
 import type { DrawerStop } from './drawer';
-import { aroundLabel, fmtDur, fmtTime, joinAnd, relWord, repeatWords } from './format';
-import { Header, type View } from './Header';
+import { aroundLabel, fmtDur, fmtTime, joinAnd, planMessage, relWord, repeatWords } from './format';
+import { allCards, Header, type View } from './Header';
 import { Month } from './Month';
 import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
 import { Rail } from './Rail';
@@ -97,13 +97,20 @@ export function App() {
     if (rolled.current) return;
     rolled.current = true;
     api.rollover()
-      .then((r) => {
+      .then(async (r) => {
         const n = r.item.moved.length;
         if (!n || !r.undo) return;
         const token = r.undo;
-        say(`Moved ${n} unfinished task${n > 1 ? 's' : ''} to today’s Sometime lane.`, [
-          { label: 'Undo', run: () => void api.undo(token).then(reload) },
-        ]);
+        // With automatic scheduling on, some are penciled in already, so they're off the Sometime lane.
+        const lane = new Set((await loadAll(null, false)).day.sometime.map((s) => s.taskId));
+        const p = r.item.moved.filter((id) => !lane.has(id)).length;
+        const tasks = `${n} unfinished task${n > 1 ? 's' : ''}`;
+        const msg = !p
+          ? `Moved ${tasks} to today’s Sometime lane.`
+          : p === n
+            ? `Moved ${tasks} to today and penciled ${n > 1 ? 'them' : 'it'} in.`
+            : `Moved ${tasks} to today and penciled in ${p}. The rest are in the Sometime lane.`;
+        say(msg, [{ label: 'Undo', run: () => void api.undo(token).then(reload) }]);
         return reload();
       })
       .catch(() => {});
@@ -203,7 +210,26 @@ export function App() {
     return r;
   };
 
-  const checkTask = (id: string, done: boolean) => act(() => api.setTaskDone(id, done));
+  /**
+   * Checks a task off. A task with a range estimate then asks "How long did it take?" (spec §10):
+   * one tap, and optional. Fixed-length sessions never ask.
+   */
+  const checkTask = (id: string, done: boolean) => {
+    const t = data ? allCards(data.day.groups).find((x) => x.id === id) : undefined;
+    const asks = done && t && t.estLow != null && t.estHigh != null && t.estLow !== t.estHigh && t.sessionMinutes == null;
+    if (!asks) return act(() => api.setTaskDone(id, done));
+    return change(() => api.setTaskDone(id, true), 'Done. How long did it take?', () => {
+      const answer = (label: string, fb: 'as_planned' | 'longer' | 'shorter', reply: string) => ({
+        label,
+        run: () => void api.setDurationFeedback(id, fb).then(() => say(reply), () => say('Couldn’t save that.')),
+      });
+      return [
+        answer('About as planned', 'as_planned', 'Noted.'),
+        answer('Longer', 'longer', 'Noted. Similar tasks will get longer estimates later on.'),
+        answer('Shorter', 'shorter', 'Noted. Similar tasks will get shorter estimates later on.'),
+      ];
+    });
+  };
   const checkRoutine = (r: DailyRow) => act(() => api.setRoutineChecked(r.routineId, data!.day.date, !r.checked));
   const checkBlock = (b: Shown) => {
     const item = b.item;
@@ -464,7 +490,7 @@ export function App() {
               onDetails={(b, el) => setPop({ b, el })}
               onRemove={(b) => void removeBlock(b)}
               onClearSometime={(taskId) => void change(() => api.clearSometime(taskId), 'Back on your list.')}
-              onPlan={() => say('The planner isn’t built yet. It comes in a later step.')}
+              onPlan={(target) => void change(() => api.plan(target), (r) => planMessage(r, day.today, day.zone))}
               drag={{
                 begin: drag.begin,
                 view: drag.view,

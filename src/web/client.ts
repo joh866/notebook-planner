@@ -8,6 +8,7 @@ import type {
   DropInput,
   DropResult,
   MonthView,
+  PlanResult,
   SettingsView,
   WeekView,
 } from '../shared/api';
@@ -80,6 +81,8 @@ export type ClassInput = Omit<ClassRow, 'id' | 'timeZone' | 'categoryId'>;
 
 export const api = {
   rollover: () => send<Changed<{ moved: string[] }>>('POST', `/api/rollover?${tz()}`),
+  /** The Plan button (spec §12). */
+  plan: (date: string) => send<Changed<PlanResult>>('POST', `/api/plan?${tz()}`, { date }),
   undo: (token: string) => send<{ ok: true }>('POST', `/api/undo/${token}`),
   /** Drag and drop. Positions are minutes on the shown day, in this device's zone. */
   drop: (body: DropInput) => send<Changed<DropResult>>('POST', `/api/drops?${tz()}`, body),
@@ -88,6 +91,9 @@ export const api = {
 
   setTaskDone: (id: string, done: boolean) =>
     send<Changed>('PATCH', `/api/tasks/${id}`, { doneAt: done ? new Date().toISOString() : null }),
+  /** The answer to "How long did it take?" (spec §10). */
+  setDurationFeedback: (id: string, feedback: 'as_planned' | 'longer' | 'shorter') =>
+    send<Changed>('PATCH', `/api/tasks/${id}`, { durationFeedback: feedback }),
   patchTask: (id: string, body: { notes?: string | null; categoryId?: string | null }) => send<Changed>('PATCH', `/api/tasks/${id}`, body),
   deleteTask: (id: string) => send<Changed>('DELETE', `/api/tasks/${id}`),
   decide: (id: string, yes: boolean) => send<Changed<DecisionResult>>('POST', `/api/tasks/${id}/decide`, { yes }),

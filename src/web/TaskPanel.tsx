@@ -328,6 +328,12 @@ function AddBox({ onAdd }: { onAdd: (text: string) => Promise<boolean> }) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Empty, it's one line (CSS). Measuring then can go wrong while the panel is still being laid out.
+    if (!text) {
+      el.style.height = '';
+      el.style.overflowY = '';
+      return;
+    }
     el.style.height = 'auto';
     el.style.height = `${Math.min(180, Math.ceil(el.scrollHeight))}px`;
     el.style.overflowY = el.scrollHeight > 180 ? 'auto' : 'hidden';

@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { addDays, weekStartOf } from '../core/day';
 import type { DayView, TaskCard } from '../shared/api';
-import { deadlineOn, fmtTime, joinAnd, longDate, relWord, shortDate } from './format';
+import { capacityText, deadlineOn, fmtTime, joinAnd, longDate, relWord, shortDate } from './format';
 import { GearIcon } from './icons';
 
 export type View = 'day' | 'week' | 'month';
@@ -71,6 +71,7 @@ export function Header({ view, date, day, weekStart, now, onView, onShift, onTod
   const clock = fmtTime(now.hour * 60 + now.minute);
   const overdue = day.header.overdue.map((o) => o.name);
   const next = nextDeadlineText(day);
+  const capacity = day.capacity ? capacityText(day.capacity, day.today, day.zone) : null;
   const back = (cls: string) => (
     <button className={`box tab backtoday ${cls}`} onClick={onToday}>
       Back to today
@@ -111,7 +112,7 @@ export function Header({ view, date, day, weekStart, now, onView, onShift, onTod
         </div>
       </div>
       <div className="rule"></div>
-      {(overdue.length > 0 || next || day.zone !== day.homeZone) && (
+      {(overdue.length > 0 || next || capacity || day.zone !== day.homeZone) && (
         <p className="sub">
           {overdue.length > 0 && <span className="od">Overdue: {joinAnd(overdue)}. </span>}
           {next && (
@@ -119,6 +120,7 @@ export function Header({ view, date, day, weekStart, now, onView, onShift, onTod
               <span className="lab">Next deadline:</span> {next}
             </>
           )}
+          {capacity && <span className="warn">{capacity}</span>}
           {day.zone !== day.homeZone && (
             <span className="zone">
               Showing {city(day.zone)} time. Classes and deadlines are set in {city(day.homeZone)} time.

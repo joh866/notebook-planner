@@ -102,3 +102,29 @@ describe('drop words', () => {
     expect(repeatWords({ repeat: 'weekly', repeatDays: [1, 3], repeatEvery: 1 })).toBe('every Monday and Wednesday');
   });
 });
+
+describe('planner words', () => {
+  it('rounds hours to 15 minutes', async () => {
+    const { fmtHours } = await import('./format');
+    expect(fmtHours(300)).toBe('5h');
+    expect(fmtHours(268)).toBe('4h 30m');
+    expect(fmtHours(44)).toBe('45m');
+  });
+
+  it('says the capacity warning as the spec does (§6)', async () => {
+    const { capacityText } = await import('./format');
+    expect(capacityText({ level: 'tight', work: 300, free: 240, dueAt: '2026-10-06T19:00:00Z', dueDate: null }, '2026-10-02', 'America/Chicago'))
+      .toBe('Tight: about 5h of work is due by Tuesday at 2pm, and you have about 4h of free time before then.');
+    expect(capacityText({ level: 'heads-up', work: 90, free: 160, dueAt: null, dueDate: '2026-10-03' }, '2026-10-02', 'America/Chicago'))
+      .toBe('Heads up: about 1h 30m of work is due by tomorrow, and you have about 2h 45m of free time before then.');
+  });
+
+  it('says what the Plan button did', async () => {
+    const { planMessage } = await import('./format');
+    const one = { date: '2026-10-02', placed: [{ title: 'Read', startAt: '2026-10-02T21:15:00Z' }], lifted: 0, free: 300 };
+    expect(planMessage(one, '2026-10-02', 'America/Chicago')).toBe('Penciled in “Read” today at 4:15pm.');
+    expect(planMessage({ ...one, date: '2026-10-03', placed: [one.placed[0]!, one.placed[0]!] }, '2026-10-02', 'America/Chicago')).toBe('Penciled in 2 tasks for tomorrow.');
+    expect(planMessage({ ...one, placed: [], free: 0 }, '2026-10-02', 'America/Chicago')).toBe('There’s no free time left today.');
+    expect(planMessage({ ...one, placed: [] }, '2026-10-02', 'America/Chicago')).toBe('Nothing to plan. Everything is scheduled, waiting, or needs a decision.');
+  });
+});

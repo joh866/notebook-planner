@@ -18,6 +18,7 @@ import type { Db } from './db/client';
 import * as t from './db/schema';
 import { readBody, type Run } from './resources';
 import { tableOf, type Change, type TableName, type Tx } from './undo';
+import { autoPencil } from './plan';
 import { getSettings } from './views';
 
 // The add box (spec §11). The text is split into chunks that the AI sorts in parallel; a chunk that
@@ -237,6 +238,10 @@ export function registerAdds(app: Hono, db: Db, run: Run, now: () => DateTime, s
     return c.json(run((tx, change): AddResult => {
       const adder = new Adder(tx, change, { now: at, zone, homeZone: settings.homeTimeZone, today, tags });
       for (const item of items) adder.add(item);
+      // With automatic scheduling on, new tasks that are due soon get penciled in (spec §12).
+      const tasks = adder.added.filter((a) => a.kind === 'task');
+      const penciled = autoPencil(db, tx, change, at, device, tasks.map((a) => a.id));
+      for (const a of tasks) a.penciled = penciled.get(a.id) ?? null;
       return { added: adder.added, chunks: chunks.length, fellBack, reason };
     }));
   });

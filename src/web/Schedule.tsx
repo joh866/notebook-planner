@@ -95,7 +95,8 @@ interface Props {
   onDetails: (b: Shown, el: HTMLElement) => void;
   onRemove: (b: Shown) => void;
   onClearSometime: (taskId: string) => void;
-  onPlan: () => void;
+  /** Plans the given day. */
+  onPlan: (date: string) => void;
   drag: { begin: BeginDrag; view: DragView | null; onGeometry: (g: Geometry) => void };
 }
 
@@ -153,7 +154,7 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
           ))}
         </div>
         {target && (
-          <button className="box planbtn" onClick={onPlan}>
+          <button className="box planbtn" onClick={() => onPlan(target)}>
             {planLabel(day.today, target)}
           </button>
         )}
