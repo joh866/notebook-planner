@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 2.
+Step 3.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -9,7 +9,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
 ## Part 1: the app on localhost
 
 - [x] **1. Scaffold.** Set up the project per the AGENTS.md stack. `npm run dev` starts the server and web app. The page shows the notebook paper background and the header (today's date in Caveat, plus the time). It uses the prototype's CSS variables and fonts, and switches between day and night automatically (night from 8pm to 8am). `npm run check` runs typecheck, lint, and one trivial test. Add `npm run dev` to `.claude/launch.json` so the Claude browser pane can open the app.
-- [ ] **2. Data model and seed.** Tables for everything in spec §9, §10, and §13:
+- [x] **2. Data model and seed.** Tables for everything in spec §9, §10, and §13:
   - Tasks with steps, notes, categories, windows, deadlines, estimates, and check-in conditions.
   - Routines with repeats.
   - Routine times on the schedule, with per-day exceptions.
@@ -71,3 +71,4 @@ Ideas and annoyances from using the app. Add them here. Don't fix them in the mi
 ## Notes
 Agents add short notes here when a step is done.
 - Step 1: Vite (5173, root `src/web`) proxies `/api` to Hono (8787, override with `API_PORT`, not `PORT`, since the preview pane sets `PORT`). `src/core/look.ts` decides day/night (tested); ESLint blocks server/web/db imports in `src/core`. The header date uses a simple 4-hour offset for the 4am boundary; step 3 replaces it with the core function. Phone layout is a `max-width:700px` media query. SQLite/Drizzle are added in step 2 and the Anthropic SDK in step 10.
+- Step 2: Drizzle schema in `src/server/db/schema.ts`, migrations in `drizzle/` (regenerate with `npm run db:generate`), applied by `openDb()` in `client.ts` (tests use `openDb(':memory:')`). Deadlines are `due_at` (UTC, time given) or `due_date` (day only), never both. Classes store Chicago wall-clock `HH:mm` plus a `time_zone` column. Routine times are `routine_slots` with per-day `routine_slot_exceptions` (skip or move). Overdue isn't stored; it's derived. Settings are one row (id 1). Weekdays are 0–6 with Sunday as 0. The seed fills an empty database only. Seed choices not in the spec: meditate is 10 min, gratitude 15, laundry and dorm 60. Shopping is This week, and Epiphany is Ongoing per §16 (the prototype had Soon).
