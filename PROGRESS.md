@@ -80,7 +80,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
 
 ## Backlog
 Ideas and annoyances from using the app. Add them here. Don't fix them in the middle of another step.
--
+- Temporary: `vite.config.ts` sets `server.host: '0.0.0.0'` so the phone can open the dev server on the same Wi-Fi (Mac's IP, port 5173). There's no sign-in, so anyone on that network can read and edit the planner. Remove it in step 14, once the app is online with a sign-in.
 
 ## Notes
 Agents add short notes here when a step is done.
