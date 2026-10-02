@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { BlockItem, ClassItem, DayView, MonthView, RoutineItem, WeekView } from '../shared/api';
+import type { AgendaView, BlockItem, ClassItem, DayView, MonthView, RoutineItem, WeekView } from '../shared/api';
 import { createApp } from './app';
 import { openDb } from './db/client';
 import { seed } from './db/seed';
@@ -134,6 +134,30 @@ describe('GET /api/week and /api/month', () => {
     expect(day(10).chores.map((c) => c.routineId)).toEqual(['laundry']);
     expect(day(6).deadlines.map((d) => d.taskId)).toEqual(['muqaddimah', 'response']);
     expect(day(9).deadlines.map((d) => d.taskId)).toEqual(['econ-pset']);
+  });
+});
+
+describe('GET /api/agenda', () => {
+  it('covers the next 10 days from today by default, across a month end', async () => {
+    const a = await get<AgendaView>('/api/agenda');
+    expect(a.from).toBe('2026-10-02');
+    expect(a.days.map((d) => d.date)).toEqual(Array.from({ length: 10 }, (_, i) => `2026-10-${String(i + 2).padStart(2, '0')}`));
+    expect(a.days[0]!.events.map((e) => e.id)).toEqual(['rso-fair']);
+    expect(a.days[4]!.deadlines.map((d) => d.taskId)).toEqual(['muqaddimah', 'response']);
+    const late = await get<AgendaView>('/api/agenda/2026-10-27?days=8');
+    expect(late.days.map((d) => d.date).slice(-3)).toEqual(['2026-11-01', '2026-11-02', '2026-11-03']);
+  });
+
+  it('shows skipped classes', async () => {
+    await call('PUT', '/api/class-skips/econ-disc/2026-10-09');
+    const a = await get<AgendaView>('/api/agenda/2026-10-09?days=1');
+    expect(a.days[0]!.skippedClasses.map((c) => c.classId)).toEqual(['econ-disc']);
+  });
+
+  it('rejects a bad day count', async () => {
+    expect((await call('GET', '/api/agenda?days=0')).status).toBe(400);
+    expect((await call('GET', '/api/agenda?days=43')).status).toBe(400);
+    expect((await call('GET', '/api/agenda?days=two')).status).toBe(400);
   });
 });
 

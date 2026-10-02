@@ -189,3 +189,22 @@ export function resizedLength(startMin: number, endMin: number): number {
   const end = Math.round(endMin / SNAP) * SNAP;
   return Math.max(SNAP, Math.min(DAY_TO - startMin, end - startMin));
 }
+
+/** Hour height in the week's time grid (spec §8). */
+export const WEEK_HOUR_PX = 44;
+
+/**
+ * The hours the week grid shows: your usual day, stretched to fit anything scheduled earlier or
+ * later, on whole hours and within 6am to 3am.
+ */
+export function weekHours(wakeMin: number, bedMin: number, items: Span[]): { from: number; to: number } {
+  let lo = wakeMin;
+  let hi = bedMin;
+  for (const x of items) {
+    lo = Math.min(lo, x.startMin);
+    hi = Math.max(hi, x.endMin);
+  }
+  const from = Math.max(DAY_FROM, Math.floor(lo / 60) * 60);
+  const to = Math.min(DAY_TO, Math.ceil(hi / 60) * 60);
+  return { from, to: Math.max(to, from + 60) };
+}

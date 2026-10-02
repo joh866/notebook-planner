@@ -27,6 +27,9 @@ export const MonthSchema = z
   .regex(/^\d{4}-\d{2}$/, 'Expected yyyy-MM')
   .refine((s) => DateTime.fromFormat(s, 'yyyy-MM').isValid, 'Not a real month');
 
+/** How many days an agenda read covers: up to six weeks, enough for a mini month. */
+export const AgendaDaysSchema = z.coerce.number().int().min(1).max(42);
+
 export const ClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:mm');
 
 /** Any ISO moment with an offset, stored as UTC ("2026-10-06T19:00:00Z"). */
@@ -457,6 +460,12 @@ export interface MonthDay {
 export interface MonthView extends ViewContext {
   month: string;
   weekStart: number;
+  days: MonthDay[];
+}
+
+/** GET /api/agenda/:date?days=N. Consecutive days from `from`. */
+export interface AgendaView extends ViewContext {
+  from: string;
   days: MonthDay[];
 }
 

@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
 import { rollover } from '../core/rollover';
-import { DaySchema, MonthSchema, SettingsPatchSchema, ZoneSchema } from '../shared/api';
+import { AgendaDaysSchema, DaySchema, MonthSchema, SettingsPatchSchema, ZoneSchema } from '../shared/api';
 import type { Health } from '../shared/schemas';
 import type { Db } from './db/client';
 import * as t from './db/schema';
@@ -11,7 +11,7 @@ import { registerAnswers } from './answers';
 import { registerDrops } from './drops';
 import { notFound, readBody, registerResources, type Run } from './resources';
 import { Change, UndoStore, applyUndo, findRows, whereKey } from './undo';
-import { dayView, getSettings, monthView, rolloverInputs, weekView } from './views';
+import { agendaView, dayView, getSettings, monthView, rolloverInputs, weekView } from './views';
 
 export interface AppOptions {
   db: Db;
@@ -56,6 +56,10 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   app.get('/api/day/:date?', (c) => c.json(dayView(db, now(), optional(DaySchema, c.req.param('date')), tz(c))));
   app.get('/api/week/:date?', (c) => c.json(weekView(db, now(), optional(DaySchema, c.req.param('date')), tz(c))));
   app.get('/api/month/:month?', (c) => c.json(monthView(db, now(), optional(MonthSchema, c.req.param('month')), tz(c))));
+  app.get('/api/agenda/:date?', (c) => {
+    const days = AgendaDaysSchema.parse(c.req.query('days') ?? '10');
+    return c.json(agendaView(db, now(), optional(DaySchema, c.req.param('date')), days, tz(c)));
+  });
 
   app.get('/api/settings', (c) => c.json(getSettings(db)));
   app.patch('/api/settings', async (c) => {

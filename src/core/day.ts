@@ -49,3 +49,15 @@ export function weekday(date: string): number {
 export function weekStartOf(date: string, weekStart: number): string {
   return addDays(date, -((weekday(date) - weekStart + 7) % 7));
 }
+
+/**
+ * The days a calendar grid shows for a "yyyy-MM" month: whole weeks from the week containing the
+ * 1st through the week containing the last day.
+ */
+export function monthCells(month: string, weekStart: number): string[] {
+  const first = `${month}-01`;
+  const last = parseDay(first).endOf('month').toFormat(FMT);
+  const out: string[] = [];
+  for (let d = weekStartOf(first, weekStart); d <= last || out.length % 7; d = addDays(d, 1)) out.push(d);
+  return out;
+}

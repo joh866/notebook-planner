@@ -46,7 +46,6 @@ button.box:hover { background:var(--hover); }
 .dayview { border:1.5px solid var(--frame); border-radius:8px; background:var(--panel); padding:12px 14px 18px; }
 .tasks { position:sticky; top:14px; align-self:start; max-height:calc(100vh - 28px); display:flex; flex-direction:column; border:1.5px solid var(--frame); border-radius:8px; background:var(--panel); }
 .tasks-inner { overflow:auto; padding:0 16px 16px; }
-.soon-view { padding:24px; color:var(--muted); }
 .loading { font-family:var(--hand); font-size:26px; color:var(--muted); }
 
 /* ---------- Header ---------- */
@@ -282,6 +281,73 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .toast button:hover { background:rgba(127,127,127,.2); }
 
 
+/* ---------- Left rail (screens 1400px and wider) ---------- */
+.rail { display:none; }
+@media (min-width:1400px) {
+  .screen { grid-template-columns:236px minmax(0, 7fr) minmax(340px, 4.6fr); grid-template-areas:"top top top" "rail main tasks"; }
+  .rail { display:flex; flex-direction:column; gap:14px; grid-area:rail; position:sticky; top:14px; align-self:start; max-height:calc(100vh - 28px); overflow:auto; }
+}
+.rail-box { border:1.5px solid var(--frame); border-radius:8px; background:var(--panel); padding:10px 12px 12px; }
+.rail-h { font-family:var(--hand); font-size:24px; font-weight:600; line-height:1.1; margin-bottom:6px; }
+.mini { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; text-align:center; }
+.mini .mh { color:var(--muted); font-size:11px; padding-bottom:2px; }
+.mini button { border:0; background:transparent; height:28px; border-radius:6px; position:relative; font-size:12.5px; padding:0; }
+.mini button:hover { background:var(--hover); }
+.mini button.is-today { box-shadow:inset 0 0 0 1.5px var(--ink); font-weight:700; }
+.mini button.sel { background:var(--hl); font-weight:700; }
+.mini button.other { color:var(--muted); opacity:.55; }
+.mini button i { position:absolute; left:50%; bottom:3px; width:4px; height:4px; margin-left:-2px; border-radius:50%; background:var(--red); }
+.cu-day { padding:6px 4px; border-top:1px dashed var(--line); cursor:pointer; border-radius:4px; }
+.cu-day:first-of-type { border-top:0; }
+.cu-day:hover { background:var(--hover); }
+.cu-date { font-weight:700; font-size:12.5px; margin-bottom:1px; }
+.cu-item { font-size:12.5px; display:flex; gap:6px; align-items:baseline; }
+.cu-item i { width:7px; height:7px; border-radius:50%; background:var(--cat); flex:none; transform:translateY(-1px); }
+.cu-item.is-due { color:var(--red); font-weight:700; }
+.cu-empty { font-size:12.5px; color:var(--muted); }
+
+/* ---------- Week: time grid ---------- */
+.wk-box { border:1.5px solid var(--frame); border-radius:8px; background:var(--panel); overflow:auto; max-height:calc(100vh - 210px); min-height:420px; position:relative; --gut:54px; --col:minmax(0, 1fr); }
+.wk-top { position:sticky; top:0; z-index:5; background:var(--panel); display:grid; grid-template-columns:var(--gut) repeat(7, var(--col)); border-bottom:1.5px solid var(--frame); }
+.wk-body { display:grid; grid-template-columns:var(--gut) repeat(7, var(--col)); position:relative; }
+.wk-corner { position:sticky; left:0; background:var(--panel); z-index:2; }
+.wk-dh { border-left:1px solid var(--line); padding:6px 4px 2px; display:flex; flex-direction:column; align-items:center; color:var(--muted); font-size:12px; cursor:pointer; }
+.wk-dh b { font-family:var(--hand); font-size:28px; line-height:1.05; color:var(--ink); padding:0 6px; border-radius:4px; }
+.wk-dh.is-today b { background:var(--hl); }
+.wk-ad { min-height:26px; padding:2px 4px 5px; border-left:1px solid var(--line); display:flex; flex-direction:column; gap:2px; cursor:pointer; min-width:0; }
+.wk-ad .d { font-family:var(--hand); font-size:16px; line-height:1.1; color:var(--red); }
+.wk-ad .s { font-size:11px; padding:1px 5px; border-radius:4px; background:color-mix(in srgb, var(--cat) var(--fill), var(--card)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wk-ad .s.done { opacity:.5; text-decoration:line-through; }
+.wk-gut { position:sticky; left:0; z-index:3; background:var(--panel); }
+.wk-gut span { position:absolute; right:7px; transform:translateY(-50%); font-size:11px; color:var(--muted); white-space:nowrap; }
+.wk-col { position:relative; border-left:1px solid var(--line); cursor:pointer; min-width:0; }
+.wk-col:hover, .wk-dh:hover, .wk-ad:hover { background-color:var(--hover); }
+.wk-col.is-today { background-color:color-mix(in srgb, var(--hl) 16%, transparent); }
+.wk-line { position:absolute; left:0; right:0; border-top:1px solid var(--line); pointer-events:none; }
+.wk-b { position:absolute; padding:2px 5px; font-size:11px; line-height:1.25; overflow:hidden; border-radius:3px 7px 3px 6px; background:color-mix(in srgb, var(--cat) var(--fill), var(--card)); pointer-events:none; }
+.wk-b b { font-weight:700; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wk-b span { color:var(--muted); white-space:nowrap; }
+.wk-b.tentative { background:color-mix(in srgb, var(--cat) 9%, var(--card)); border:1.2px dashed var(--cat); }
+.wk-b.skipped { background:transparent; border:1.2px dashed var(--muted); opacity:.6; text-decoration:line-through; }
+.wk-b.routine { opacity:.7; }
+.wk-b.done { opacity:.5; }
+.wk-now { position:absolute; left:0; right:0; border-top:2px solid var(--red); z-index:2; pointer-events:none; }
+.wk-dueline { position:absolute; left:0; right:0; border-top:2px dashed var(--red); z-index:2; pointer-events:none; }
+
+/* ---------- Month ---------- */
+.month-grid { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:6px; }
+.mo-head { font-size:12px; color:var(--muted); padding:0 4px; }
+.mo-cell { min-height:100px; border:1.5px solid var(--frame); background:var(--panel); border-radius:6px; padding:6px; font-size:12px; overflow:hidden; cursor:pointer; min-width:0; }
+.mo-cell:hover { border-color:var(--ink); }
+.mo-cell.blank { background:transparent; border-color:transparent; cursor:default; }
+.mo-cell.is-today { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+.mo-cell .n { font-family:var(--hand); font-size:22px; line-height:1; display:block; margin-bottom:3px; }
+.mo-cell .ev { display:flex; align-items:center; gap:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mo-cell .ev i { width:6px; height:6px; border-radius:50%; background:var(--cat); flex:none; }
+.mo-cell .ev.is-due { color:var(--red); font-weight:700; }
+.mo-cell .ev.quiet { color:var(--muted); }
+.mo-cell .ev.done { text-decoration:line-through; }
+
 /* ---------- Phone ---------- */
 @media (max-width:700px) {
   .device { padding:14px 12px 40px; }
@@ -307,6 +373,12 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
   .clock { font-size:22px; }
   .wide-only { display:none; }
   .phone-only { display:inline; }
+  /* Step 9 adds the phone week list and the compact month. Until then the grid swipes sideways. */
+  .wk-box { max-height:calc(100vh - 170px); min-height:0; --gut:44px; --col:112px; }
+  .month-grid { gap:3px; }
+  .mo-cell { min-height:50px; padding:4px 2px; }
+  .mo-cell .n { font-size:19px; text-align:center; margin-bottom:0; }
+  .mo-cell .ev { font-size:10px; }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; animation:none !important; } }

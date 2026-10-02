@@ -1,4 +1,15 @@
-import type { CategoryView, ConditionAnswer, DayView, DecisionResult, DropInput, DropResult, SettingsView } from '../shared/api';
+import type {
+  AgendaView,
+  CategoryView,
+  ConditionAnswer,
+  DayView,
+  DecisionResult,
+  DropInput,
+  DropResult,
+  MonthView,
+  SettingsView,
+  WeekView,
+} from '../shared/api';
 
 // Talks to the server. The web app never works out the plan itself; it shows what comes back.
 
@@ -24,15 +35,26 @@ export interface Loaded {
   day: DayView;
   settings: SettingsView;
   categories: CategoryView[];
+  /** Only when the Week tab is open. */
+  week: WeekView | null;
+  /** The selected day's month: the Month tab and the left rail's mini month. */
+  month: MonthView;
+  /** The next 10 days from today: the left rail's Coming up list (spec §5). */
+  coming: AgendaView;
 }
 
-export async function loadDay(date: string | null): Promise<Loaded> {
-  const [day, settings, categories] = await Promise.all([
-    send<DayView>('GET', `/api/day${date ? `/${date}` : ''}?${tz()}`),
+/** Everything one screen shows. `date` is the selected day, or null for today. */
+export async function loadAll(date: string | null, withWeek: boolean): Promise<Loaded> {
+  const at = date ? `/${date}` : '';
+  const [day, settings, categories, week, month, coming] = await Promise.all([
+    send<DayView>('GET', `/api/day${at}?${tz()}`),
     send<SettingsView>('GET', '/api/settings'),
     send<CategoryView[]>('GET', '/api/categories'),
+    withWeek ? send<WeekView>('GET', `/api/week${at}?${tz()}`) : null,
+    send<MonthView>('GET', `/api/month${date ? `/${date.slice(0, 7)}` : ''}?${tz()}`),
+    send<AgendaView>('GET', `/api/agenda?days=10&${tz()}`),
   ]);
-  return { day, settings, categories: [...categories].sort((a, b) => a.sortOrder - b.sortOrder) };
+  return { day, settings, categories: [...categories].sort((a, b) => a.sortOrder - b.sortOrder), week, month, coming };
 }
 
 export interface Changed<T = unknown> {

@@ -6,13 +6,16 @@ import { minutesOnDay } from '../core/time';
 import type { DailyRow, DropInput, StepView, TaskCard } from '../shared/api';
 import { categoryName, catName, nextColor } from './cats';
 import { ClassDialog, classTitle } from './ClassDialog';
-import { api, loadDay, type Changed, type Loaded } from './client';
+import { api, loadAll, type Changed, type Loaded } from './client';
 import { useDrag, type DragItem, type DropTarget, type Geometry } from './drag';
 import { aroundLabel, fmtDur, fmtTime, joinAnd, relWord, repeatWords } from './format';
 import { Header, type View } from './Header';
+import { Month } from './Month';
 import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
+import { Rail } from './Rail';
 import { Schedule, type Shown } from './Schedule';
 import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
+import { Week } from './Week';
 
 function useNow(): DateTime {
   const [now, setNow] = useState(() => DateTime.now());
@@ -56,7 +59,7 @@ export function App() {
   const latest = useRef(0);
   const reload = useCallback(() => {
     const n = ++latest.current;
-    return loadDay(sel).then(
+    return loadAll(sel, view === 'week').then(
       (d) => {
         if (n !== latest.current) return;
         setData(d);
@@ -66,7 +69,7 @@ export function App() {
         if (n === latest.current) setError(e instanceof Error ? e.message : String(e));
       },
     );
-  }, [sel]);
+  }, [sel, view]);
 
   // At start, move unfinished tasks from past days to today (spec §10, "Rollover").
   const rolled = useRef(false);
@@ -343,6 +346,11 @@ export function App() {
     setPop(null);
     setSel(d === day.today ? null : d);
   };
+  /** Clicking a day in the week, the month, or the left rail opens it in the Day view (spec §5, §8). */
+  const openDay = (d: string) => {
+    setView('day');
+    go(d);
+  };
   // Counted from the selected day, not the loaded one, so quick clicks all count.
   const shift = (dir: -1 | 1) => {
     const from = sel ?? day.today;
@@ -368,6 +376,7 @@ export function App() {
           onToday={() => go(null)}
           onSettings={() => say('Settings come in a later step.')}
         />
+        <Rail month={data.month} coming={data.coming} selected={day.date} categories={categories} onOpenDay={openDay} />
         <main className="main">
           {view === 'day' ? (
             <Schedule
@@ -391,10 +400,20 @@ export function App() {
                 },
               }}
             />
+          ) : view === 'week' ? (
+            data.week ? (
+              <Week
+                week={data.week}
+                settings={settings}
+                categories={categories}
+                nowMin={minutesOnDay(now, day.today, zone)}
+                onOpenDay={openDay}
+              />
+            ) : (
+              <p className="loading">Loading…</p>
+            )
           ) : (
-            <section className="box soon-view">
-              <p>The {view} view comes in a later step. Use the Day tab for now.</p>
-            </section>
+            <Month month={data.month} categories={categories} onOpenDay={openDay} />
           )}
         </main>
         {view === 'day' && (

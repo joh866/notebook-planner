@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { addDays, dayEnd, dayOf, dayStart, diffDays, weekStartOf, weekday } from './day';
+import { addDays, dayEnd, dayOf, dayStart, diffDays, monthCells, weekStartOf, weekday } from './day';
 
 const CHI = 'America/Chicago';
 const at = (iso: string, zone = CHI) => DateTime.fromISO(iso, { zone });
@@ -60,6 +60,16 @@ describe('day math', () => {
     expect(weekStartOf('2026-10-04', 0)).toBe('2026-10-04');
     expect(weekStartOf('2026-10-02', 1)).toBe('2026-09-28');
     expect(weekStartOf('2026-10-04', 1)).toBe('2026-09-28');
+  });
+
+  it('lays out whole weeks for a month grid', () => {
+    const oct = monthCells('2026-10', 0);
+    expect(oct).toHaveLength(35);
+    expect([oct[0], oct[34]]).toEqual(['2026-09-27', '2026-10-31']);
+    const monday = monthCells('2026-10', 1);
+    expect([monday[0], monday.at(-1)]).toEqual(['2026-09-28', '2026-11-01']);
+    expect(monthCells('2026-02', 0)).toHaveLength(28); // Feb 1, 2026 is a Sunday, and it has 28 days
+    expect(monthCells('2026-08', 0)).toHaveLength(42); // Aug 1 is a Saturday
   });
 
   it('rejects malformed days', () => {

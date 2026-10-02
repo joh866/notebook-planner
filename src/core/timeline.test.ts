@@ -11,6 +11,7 @@ import {
   segments,
   stepParts,
   totalHeight,
+  weekHours,
   yOf,
   type SegmentInput,
 } from './timeline';
@@ -160,5 +161,16 @@ describe('resizedLength', () => {
     expect(resizedLength(600, 668)).toBe(75);
     expect(resizedLength(600, 590)).toBe(15);
     expect(resizedLength(1560, 1700)).toBe(DAY_TO - 1560);
+  });
+});
+
+describe('weekHours', () => {
+  it('shows the usual day when nothing is outside it', () => {
+    expect(weekHours(540, 1440, [{ startMin: 660, endMin: 740 }])).toEqual({ from: 540, to: 1440 });
+  });
+
+  it('stretches to whole hours around early and late items, within 6am to 3am', () => {
+    expect(weekHours(540, 1440, [{ startMin: 450, endMin: 480 }, { startMin: 1420, endMin: 1510 }])).toEqual({ from: 420, to: 1560 });
+    expect(weekHours(540, 1440, [{ startMin: 200, endMin: 1700 }])).toEqual({ from: 360, to: DAY_TO });
   });
 });

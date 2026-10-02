@@ -7,12 +7,14 @@ import { streak } from '../core/streak';
 import { clockOnDay, minutesOnDay, resolveZone } from '../core/time';
 import { deadlineDay, deadlineMoment, dueTone, effectiveWindow, isOverdue } from '../core/urgency';
 import type {
+  AgendaView,
   BlockItem,
   ClassItem,
   DailyRow,
   DaySchedule,
   DayView,
   DeadlineView,
+  MonthDay,
   MonthView,
   RoutineItem,
   RoutineStepView,
@@ -247,6 +249,18 @@ export function weekView(db: Db, now: DateTime, date: string | undefined, device
   };
 }
 
+function monthDay(ctx: Ctx, date: string): MonthDay {
+  return {
+    date,
+    deadlines: deadlinesOn(ctx, date),
+    events: blockItems(ctx, date).filter((b) => b.kind === 'event'),
+    chores: ctx.data.routines
+      .filter((r) => r.repeat === 'weekly' && routineOccursOn(r, date))
+      .map((r) => ({ routineId: r.id, title: r.title, categoryId: r.categoryId })),
+    skippedClasses: classItems(ctx, date).filter((c) => c.skipped),
+  };
+}
+
 /** Every day of a "yyyy-MM" month: deadlines, events, weekly chores, and skipped classes (spec §8). */
 export function monthView(db: Db, now: DateTime, month: string | undefined, deviceZone?: string): MonthView {
   const ctx = context(db, now, deviceZone);
@@ -255,18 +269,17 @@ export function monthView(db: Db, now: DateTime, month: string | undefined, devi
   const length = DateTime.fromFormat(first, 'yyyy-MM-dd').daysInMonth!;
   return {
     zone: ctx.zone, homeZone: ctx.homeZone, now: iso(now), today: ctx.today, month: m, weekStart: ctx.data.settings.weekStart,
-    days: Array.from({ length }, (_, i) => {
-      const date = addDays(first, i);
-      return {
-        date,
-        deadlines: deadlinesOn(ctx, date),
-        events: blockItems(ctx, date).filter((b) => b.kind === 'event'),
-        chores: ctx.data.routines
-          .filter((r) => r.repeat === 'weekly' && routineOccursOn(r, date))
-          .map((r) => ({ routineId: r.id, title: r.title, categoryId: r.categoryId })),
-        skippedClasses: classItems(ctx, date).filter((c) => c.skipped),
-      };
-    }),
+    days: Array.from({ length }, (_, i) => monthDay(ctx, addDays(first, i))),
+  };
+}
+
+/** `days` days from `from` (today by default), shaped like month days. The left rail's mini month and Coming up list (spec §5). */
+export function agendaView(db: Db, now: DateTime, from: string | undefined, days: number, deviceZone?: string): AgendaView {
+  const ctx = context(db, now, deviceZone);
+  const start = from ?? ctx.today;
+  return {
+    zone: ctx.zone, homeZone: ctx.homeZone, now: iso(now), today: ctx.today, from: start,
+    days: Array.from({ length: days }, (_, i) => monthDay(ctx, addDays(start, i))),
   };
 }
 
