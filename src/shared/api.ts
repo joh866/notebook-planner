@@ -408,3 +408,23 @@ export interface MonthView extends ViewContext {
   weekStart: number;
   days: MonthDay[];
 }
+
+/** GET /api/settings. */
+export interface SettingsView {
+  wakeTime: string;
+  bedTime: string;
+  look: 'auto' | 'day' | 'night';
+  timeZone: string;
+  homeTimeZone: string;
+  autoSchedule: boolean;
+  weekStart: number;
+}
+
+/** GET /api/categories. Built-ins have no color; they use the palette in spec §4. */
+export interface CategoryView {
+  id: string;
+  name: string;
+  color: string | null;
+  builtin: boolean;
+  sortOrder: number;
+}
