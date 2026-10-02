@@ -193,6 +193,32 @@ export const ConditionPatchSchema = ConditionFields.partial();
 /** Yes or No on a decision item (spec §10). */
 export const DecideInputSchema = z.strictObject({ yes: z.boolean() });
 
+/** A spot on a day's schedule, in wall-clock minutes after midnight (6am to 3am the next night). */
+const DayMinute = z.int().min(6 * 60).max(27 * 60);
+
+/**
+ * Drag and drop (spec §10). Each drop is one change with one Undo. Positions are minutes on `date`
+ * as shown in the device's zone (`?tz=`); the server turns them into moments or local clock times.
+ * Drops onto the task panel use the plain deletes (blocks, routine slots, Sometime entries).
+ */
+export const DropInputSchema = z.discriminatedUnion('action', [
+  /** A task card or Sometime chip onto the schedule: a new pinned block. */
+  z.strictObject({ action: z.literal('placeTask'), taskId: Id, date: DaySchema, startMin: DayMinute }),
+  /** A task card, chip, or task block onto the Sometime lane. A dragged block comes off the schedule. */
+  z.strictObject({ action: z.literal('commitTask'), taskId: Id, date: DaySchema, blockId: Id.optional() }),
+  /** A task, event, or open-time block to a new time. It becomes pinned. */
+  z.strictObject({ action: z.literal('moveBlock'), blockId: Id, date: DaySchema, startMin: DayMinute, label: Title.nullish() }),
+  /** A routine block to a new time, for this day only or every day. */
+  z.strictObject({ action: z.literal('moveRoutine'), slotId: Id, date: DaySchema, startMin: DayMinute, everyDay: z.boolean().optional() }),
+  /** A Daily checklist row onto the schedule: it repeats at that time. */
+  z.strictObject({ action: z.literal('placeRoutine'), routineId: Id, date: DaySchema, startMin: DayMinute }),
+  /** A block's new length. */
+  z.strictObject({ action: z.literal('resizeBlock'), blockId: Id, minutes: Minutes }),
+  /** A routine block's new length, for this day only or every day. */
+  z.strictObject({ action: z.literal('resizeRoutine'), slotId: Id, date: DaySchema, minutes: Minutes, everyDay: z.boolean().optional() }),
+]);
+export type DropInput = z.infer<typeof DropInputSchema>;
+
 export const SettingsPatchSchema = z.strictObject({
   wakeTime: ClockSchema,
   bedTime: ClockSchema,
@@ -224,6 +250,11 @@ export interface DecisionResult {
 /** POST /api/conditions/:id/answer. The tasks that moved to Soon. */
 export interface ConditionAnswer {
   moved: { id: string; title: string }[];
+}
+
+/** POST /api/drops. `routine` is set for placeRoutine, so the message can say how it repeats. */
+export interface DropResult {
+  routine: { title: string; repeat: 'daily' | 'weekly'; repeatDays: number[] | null; repeatEvery: number; start: string } | null;
 }
 
 export interface StepView {
@@ -365,6 +396,8 @@ export interface SometimeView {
   categoryId: string | null;
   done: boolean;
   rolledFrom: string | null;
+  /** How long its block is when it goes on the schedule (spec §12). */
+  minutes: number;
 }
 
 export interface DailyRow {

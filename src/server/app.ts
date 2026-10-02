@@ -8,6 +8,7 @@ import type { Health } from '../shared/schemas';
 import type { Db } from './db/client';
 import * as t from './db/schema';
 import { registerAnswers } from './answers';
+import { registerDrops } from './drops';
 import { notFound, readBody, registerResources, type Run } from './resources';
 import { Change, UndoStore, applyUndo, findRows, whereKey } from './undo';
 import { dayView, getSettings, monthView, rolloverInputs, weekView } from './views';
@@ -71,6 +72,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
 
   registerResources(app, db, run);
   registerAnswers(app, run, now);
+  registerDrops(app, db, run, now);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {

@@ -29,6 +29,7 @@ body {
 }
 button, input, textarea { font:inherit; color:inherit; }
 button { cursor:pointer; }
+body.is-dragging, body.is-dragging * { cursor:grabbing !important; user-select:none; -webkit-user-select:none; }
 [hidden] { display:none !important; }
 .ic { width:12px; height:12px; flex:none; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
@@ -244,10 +245,10 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .block > .cb, .block .bt, .block .bm { position:relative; z-index:1; }
 .block > .cb { position:absolute; }
 .block:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-/* Nothing drags until step 7. Cards open on click. */
-.card { cursor:pointer; }
-.chip, .check-row { cursor:default; }
-.block { cursor:pointer; }
+/* The resize handle sits above the hands-on and waiting parts. */
+.block .resize { z-index:2; }
+@media (hover:none) { .block .resize::after { opacity:.35; } }
+.tasks.drop-on { outline-offset:-2px; }
 .card.open { padding-bottom:30px; }
 .card .decide { margin-top:1px; }
 .card:has(.decide) { padding-bottom:32px; }

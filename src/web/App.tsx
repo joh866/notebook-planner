@@ -3,11 +3,12 @@ import { DateTime } from 'luxon';
 import { addDays } from '../core/day';
 import { lookForHour } from '../core/look';
 import { minutesOnDay } from '../core/time';
-import type { DailyRow, StepView, TaskCard } from '../shared/api';
+import type { DailyRow, DropInput, StepView, TaskCard } from '../shared/api';
 import { categoryName, catName, nextColor } from './cats';
 import { ClassDialog, classTitle } from './ClassDialog';
 import { api, loadDay, type Changed, type Loaded } from './client';
-import { joinAnd, relWord } from './format';
+import { useDrag, type DragItem, type DropTarget, type Geometry } from './drag';
+import { aroundLabel, fmtDur, fmtTime, joinAnd, relWord, repeatWords } from './format';
 import { Header, type View } from './Header';
 import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
 import { Schedule, type Shown } from './Schedule';
@@ -41,6 +42,7 @@ export function App() {
   const [classEdit, setClassEdit] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const scrolled = useRef(false);
+  const geometry = useRef<Geometry | null>(null);
 
   const say = useCallback((message: string, actions?: ToastState['actions'], ms?: number) => {
     setToast({ id: ++toastId, message, actions, ms });
@@ -201,6 +203,92 @@ export function App() {
     return c?.type === 'class' ? classTitle(c) : 'the class';
   };
 
+  /** "Every day instead" on a one-day routine change: undo it, then make the change on every day. */
+  const everyDayInstead = (token: string | null, body: DropInput, message: string) => () =>
+    void (async () => {
+      if (token) await api.undo(token).catch(() => {});
+      await change(() => api.drop(body), message);
+    })();
+
+  /** A finished drag (spec §10, "Drag and drop"). Every drop shows Undo. */
+  const dropped = (item: DragItem, target: DropTarget) => {
+    const date = data!.day.date;
+    if (target.kind === 'resize') {
+      if (item.type !== 'resize') return;
+      const b = item.b.item;
+      const minutes = target.minutes;
+      if (minutes === item.b.endMin - item.b.startMin) return;
+      const len = fmtDur(minutes);
+      if (b.type === 'block') return change(() => api.drop({ action: 'resizeBlock', blockId: b.id, minutes }), `“${item.title}” is now ${len}.`);
+      if (b.type === 'routine') {
+        const body: DropInput = { action: 'resizeRoutine', slotId: b.slotId, date, minutes };
+        return change(() => api.drop(body), `${item.title} is ${len} for this day only.`, (r) => [
+          { label: 'Every day instead', run: everyDayInstead(r.undo, { ...body, everyDay: true }, `${item.title} is ${len} on every day.`) },
+        ]);
+      }
+      return;
+    }
+
+    if (target.kind === 'grid') {
+      const startMin = target.startMin;
+      const at = fmtTime(startMin);
+      if (item.type === 'task' || item.type === 'sometime') {
+        return change(() => api.drop({ action: 'placeTask', taskId: item.taskId, date, startMin }), `Pinned “${item.title}” at ${at}.`);
+      }
+      if (item.type === 'routine') {
+        return change(
+          () => api.drop({ action: 'placeRoutine', routineId: item.routineId, date, startMin }),
+          (res) => `${item.title} now repeats ${res.routine ? repeatWords(res.routine) : 'every day'} at ${at}.`,
+        );
+      }
+      if (item.type !== 'block' || item.b.startMin === startMin) return;
+      const b = item.b.item;
+      if (b.type === 'block') {
+        const label = b.tentative ? aroundLabel(b.label, startMin) : undefined;
+        return change(
+          () => api.drop({ action: 'moveBlock', blockId: b.id, date, startMin, label }),
+          `Moved “${item.title}” to ${at}${b.pinned ? '' : '. It’s pinned now'}.`,
+        );
+      }
+      if (b.type === 'routine') {
+        const body: DropInput = { action: 'moveRoutine', slotId: b.slotId, date, startMin };
+        return change(() => api.drop(body), 'Moved for this day only.', (r) => [
+          { label: 'Every day instead', run: everyDayInstead(r.undo, { ...body, everyDay: true }, `Moved to ${at} on every day.`) },
+        ]);
+      }
+      return;
+    }
+
+    if (target.kind === 'sometime') {
+      const lane = `Sometime ${relWord(data!.day.today, date)}`;
+      if (item.type === 'task') return change(() => api.drop({ action: 'commitTask', taskId: item.taskId, date }), `Moved “${item.title}” to ${lane}.`);
+      if (item.type === 'block' && item.b.item.type === 'block' && item.b.item.taskId) {
+        const b = item.b.item;
+        return change(() => api.drop({ action: 'commitTask', taskId: b.taskId!, date, blockId: b.id }), `Moved “${item.title}” to ${lane}.`);
+      }
+      return;
+    }
+
+    // Onto the task panel.
+    if (item.type === 'sometime') return change(() => api.clearSometime(item.taskId), 'Back on your list.');
+    if (item.type !== 'block') return;
+    const b = item.b.item;
+    if (b.type === 'routine') {
+      return change(() => api.deleteSlot(b.slotId), `${item.title} is off the schedule. It’s still in your checklist.`);
+    }
+    if (b.type === 'block') return change(() => api.deleteBlock(b.id), b.kind === 'task' ? 'Back on your list.' : `Removed “${item.title}”.`);
+  };
+
+  const drag = useDrag({
+    geometry: () => geometry.current,
+    onStart: () => {
+      setPop(null);
+      setCatPick(null);
+    },
+    onDrop: (item, target) => void dropped(item, target),
+    onOpenStrip: (id) => setOpened((o) => ({ ...o, [id]: true })),
+  });
+
   const actions: TaskActions = {
     checkTask,
     checkRoutine,
@@ -295,6 +383,13 @@ export function App() {
               onRemove={(b) => void removeBlock(b)}
               onClearSometime={(taskId) => void change(() => api.clearSometime(taskId), 'Back on your list.')}
               onPlan={() => say('The planner isn’t built yet. It comes in a later step.')}
+              drag={{
+                begin: drag.begin,
+                view: drag.view,
+                onGeometry: (g) => {
+                  geometry.current = g;
+                },
+              }}
             />
           ) : (
             <section className="box soon-view">
@@ -313,6 +408,7 @@ export function App() {
             onShowDone={setShowDone}
             onToggleOpen={(id) => setOpenId((o) => (o === id ? null : id))}
             actions={actions}
+            drag={{ begin: drag.begin, over: drag.view?.target?.kind === 'tasks' }}
           />
         )}
       </div>

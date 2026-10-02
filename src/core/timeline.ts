@@ -147,3 +147,45 @@ export function stepParts(startMin: number, steps: { title: string; minutes: num
   }
   return out;
 }
+
+// ---------- Drops and resizing (spec §7, §10) ----------
+
+/** Drops and resizes snap to this many minutes. */
+export const SNAP = 15;
+
+/** The minute at a pixel offset from the top of the schedule. The inverse of `yOf`. */
+export function minuteAt(segs: Segment[], y: number): number {
+  let acc = 0;
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i]!;
+    const h = segmentHeight(s);
+    if (y < acc + h || i === segs.length - 1) {
+      const into = Math.max(0, Math.min(y - acc, h));
+      return s.from + (s.open ? (into / HOUR_PX) * 60 : (into / BAND_PX) * (s.to - s.from));
+    }
+    acc += h;
+  }
+  return DAY_FROM;
+}
+
+/**
+ * Where something `minutes` long dropped at minute `m` starts: snapped to 15 minutes, not before
+ * now (when the day is today), not inside a folded strip, and ending by 3am. Null when nothing
+ * fits, like late at night on today.
+ */
+export function dropStart(segs: Segment[], m: number, minutes: number, nowMin: number | null): number | null {
+  const early = segs.find((s) => s.id === 'early');
+  const late = segs.find((s) => s.id === 'late');
+  let lo = DAY_FROM;
+  if (nowMin != null) lo = Math.max(lo, Math.ceil(nowMin / SNAP) * SNAP);
+  if (early && !early.open) lo = Math.max(lo, early.to);
+  const hi = (late && !late.open ? late.from : DAY_TO) - minutes;
+  if (lo > hi) return null;
+  return Math.max(lo, Math.min(hi, Math.round(m / SNAP) * SNAP));
+}
+
+/** A block's new length when its bottom edge is dragged to `endMin`: snapped, at least 15 minutes, ending by 3am. */
+export function resizedLength(startMin: number, endMin: number): number {
+  const end = Math.round(endMin / SNAP) * SNAP;
+  return Math.max(SNAP, Math.min(DAY_TO - startMin, end - startMin));
+}

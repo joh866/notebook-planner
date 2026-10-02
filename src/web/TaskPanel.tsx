@@ -1,7 +1,9 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { blockLength } from '../core/length';
 import type { CategoryView, DailyRow, DayView, StepView, TaskCard } from '../shared/api';
 import { catName, catStyle } from './cats';
 import { cap, clockMin, deadlineOn, dueLabel, fmtDur, fmtTime, momentOn, relWord } from './format';
+import type { BeginDrag } from './drag';
 import { Check, Del, RepeatIcon } from './icons';
 
 /** What the user can do from the task panel. */
@@ -31,6 +33,8 @@ interface Props {
   onShowDone: (show: boolean) => void;
   onToggleOpen: (id: string) => void;
   actions: TaskActions;
+  /** `over` is true while something that can come back to the list is dragged over the panel. */
+  drag: { begin: BeginDrag; over: boolean };
 }
 
 const GROUPS = [
@@ -46,16 +50,16 @@ const GROUPS = [
 /** Group names by window, for messages like "Moved it to Soon." */
 export const WINDOW_LABEL: Record<string, string> = Object.fromEntries(GROUPS);
 
-export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions }: Props) {
+export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions, drag }: Props) {
   const pass = (t: TaskCard) => filter === 'all' || t.categoryId === filter;
   const chips = [{ id: 'all', name: 'All' }, ...categories.filter((c) => c.id !== 'routine')];
   const card = (t: TaskCard) => (
-    <Card key={t.id} t={t} day={day} categories={categories} open={openId === t.id} onToggle={() => onToggleOpen(t.id)} actions={actions} />
+    <Card key={t.id} t={t} day={day} categories={categories} open={openId === t.id} onToggle={() => onToggleOpen(t.id)} actions={actions} begin={drag.begin} />
   );
   const done = day.groups.done.filter(pass);
 
   return (
-    <aside className="tasks" aria-label="Tasks">
+    <aside className={`tasks${drag.over ? ' drop-on' : ''}`} aria-label="Tasks" data-drop="tasks">
       <div className="tasks-inner">
         <div className="filters">
           {chips.map((c) => (
@@ -71,7 +75,7 @@ export function TaskPanel({ day, categories, filter, showDone, openId, onFilter,
           ))}
         </div>
 
-        <Daily rows={day.daily} onCheck={actions.checkRoutine} onDelete={actions.deleteRoutine} />
+        <Daily rows={day.daily} onCheck={actions.checkRoutine} onDelete={actions.deleteRoutine} begin={drag.begin} />
 
         {GROUPS.map(([key, label]) => {
           if (key === 'waiting') {
@@ -139,7 +143,14 @@ function GroupHead({ label, count, red }: { label: string; count: number; red?: 
   );
 }
 
-function Daily({ rows, onCheck, onDelete }: { rows: DailyRow[]; onCheck: (row: DailyRow) => void; onDelete: (row: DailyRow) => void }) {
+interface DailyProps {
+  rows: DailyRow[];
+  onCheck: (row: DailyRow) => void;
+  onDelete: (row: DailyRow) => void;
+  begin: BeginDrag;
+}
+
+function Daily({ rows, onCheck, onDelete, begin }: DailyProps) {
   if (!rows.length) return null;
   return (
     <div>
@@ -150,7 +161,11 @@ function Daily({ rows, onCheck, onDelete }: { rows: DailyRow[]; onCheck: (row: D
         </span>
       </h2>
       {rows.map((r) => (
-        <div key={r.routineId} className={`check-row${r.checked ? ' done' : ''}`}>
+        <div
+          key={r.routineId}
+          className={`check-row${r.checked ? ' done' : ''}`}
+          onPointerDown={(e) => begin(e, { type: 'routine', routineId: r.routineId, title: r.title, minutes: r.durationMinutes }, e.currentTarget)}
+        >
           <Check checked={r.checked} label={r.title} onToggle={() => onCheck(r)} />
           <span className="t">{r.title}</span>
           <span className="r">
@@ -203,12 +218,16 @@ interface CardProps {
   open: boolean;
   onToggle: () => void;
   actions: TaskActions;
+  begin: BeginDrag;
 }
 
-function Card({ t, day, categories, open, onToggle, actions }: CardProps) {
+function Card({ t, day, categories, open, onToggle, actions, begin }: CardProps) {
   const decide = t.window === 'decide';
   const overdue = t.effectiveWindow === 'overdue';
-  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue', open && 'open'].filter(Boolean).join(' ');
+  // Waiting and decision items, and finished tasks, don't go on the schedule.
+  const canDrag = !decide && t.window !== 'waiting' && !t.doneAt;
+  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue', open && 'open', !canDrag && 'static']
+    .filter(Boolean).join(' ');
   const due = deadlineOn(t, day.zone);
   const { when, rest } = detailBits(t, day);
   const cat = catName(categories, t.categoryId);
@@ -221,6 +240,7 @@ function Card({ t, day, categories, open, onToggle, actions }: CardProps) {
       aria-expanded={open}
       aria-label={`${t.title}. ${open ? 'Hide' : 'Show'} steps and notes`}
       onClick={(e) => !fromControl(e) && onToggle()}
+      onPointerDown={(e) => canDrag && begin(e, { type: 'task', taskId: t.id, title: t.title, minutes: blockLength(t) }, e.currentTarget)}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();

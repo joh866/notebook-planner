@@ -47,3 +47,20 @@ export function minutesOnDay(instant: DateTime, date: string, zone: string): num
 export function isOnDay(instant: DateTime, date: string, zone: string): boolean {
   return dayOf(instant, zone) === date;
 }
+
+/**
+ * The instant at wall-clock minute `m` of a planner day in `zone`. The inverse of `minutesOnDay`:
+ * minutes past 1440 are after midnight, in the night at the end of that day.
+ */
+export function atMinute(date: string, m: number, zone: string): DateTime {
+  const calendar = m >= 1440 ? addDays(date, 1) : date;
+  const mins = ((m % 1440) + 1440) % 1440;
+  const [y, mo, d] = calendar.split('-').map(Number);
+  return DateTime.fromObject({ year: y, month: mo, day: d, hour: Math.floor(mins / 60), minute: mins % 60 }, { zone });
+}
+
+/** Local "HH:mm" for a wall-clock minute on the schedule (1500 is "01:00"). */
+export function clockOf(m: number): string {
+  const mins = ((m % 1440) + 1440) % 1440;
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+}

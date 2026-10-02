@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useLayoutEffect, useMemo, type CSSProperties } from 'react';
 import { weekday } from '../core/day';
 import {
   DAY_FROM,
@@ -15,6 +15,7 @@ import {
 } from '../core/timeline';
 import type { CategoryView, DayView, ScheduleItem, SettingsView } from '../shared/api';
 import { catStyle } from './cats';
+import { movable, type BeginDrag, type DragView, type Geometry } from './drag';
 import { cap, clockMin, fmtRange, fmtTime, joinAnd, planLabel, planTarget, relWord, shortLoc } from './format';
 import { Check, Del, PencilIcon, PinIcon, PlusIcon, RepeatIcon } from './icons';
 
@@ -95,10 +96,17 @@ interface Props {
   onRemove: (b: Shown) => void;
   onClearSometime: (taskId: string) => void;
   onPlan: () => void;
+  drag: { begin: BeginDrag; view: DragView | null; onGeometry: (g: Geometry) => void };
 }
 
-export function Schedule({ day, settings, categories, nowMin, opened, onOpen, onCheck, onCheckTask, onDetails, onRemove, onClearSometime, onPlan }: Props) {
-  const blocks = useMemo(() => day.schedule.map((x) => shown(x, day.today)), [day]);
+export function Schedule({ day, settings, categories, nowMin, opened, onOpen, onCheck, onCheckTask, onDetails, onRemove, onClearSometime, onPlan, drag }: Props) {
+  const all = useMemo(() => day.schedule.map((x) => shown(x, day.today)), [day]);
+  // While a block's bottom edge is dragged, it shows its new length.
+  const t = drag.view?.target;
+  const resizing = t?.kind === 'resize' && drag.view!.item.type === 'resize' ? { key: drag.view!.item.b.key, minutes: t.minutes } : null;
+  const blocks = resizing
+    ? all.map((b) => (b.key === resizing.key ? { ...b, endMin: b.startMin + resizing.minutes, sub: fmtRange(b.startMin, b.startMin + resizing.minutes) } : b))
+    : all;
   const segs = segments({
     wakeMin: clockMin(settings.wakeTime),
     bedMin: clockMin(settings.bedTime),
@@ -107,6 +115,9 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
     opened,
   });
   const y = (m: number) => yOf(segs, m);
+  const { onGeometry } = drag;
+  useLayoutEffect(() => onGeometry({ segs, nowMin }));
+  const ghost = t?.kind === 'grid' && drag.view ? { from: t.startMin, to: t.startMin + drag.view.item.minutes } : null;
   const target = planTarget(day.today, day.date, nowMin ?? 0);
   const isToday = day.date === day.today;
   const isPast = day.date < day.today;
@@ -124,10 +135,15 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
   return (
     <section className="dayview" aria-label="Schedule">
       <div className="schedhead">
-        <div className="lane">
+        <div className={`lane${t?.kind === 'sometime' ? ' drop-on' : ''}`} data-drop="sometime">
           <span className="lab">Sometime {isToday ? 'today' : weekdayName(day.date)}</span>
           {day.sometime.map((s) => (
-            <div key={s.taskId} className={`chip${s.done ? ' done' : ''}`} style={catStyle(categories, s.categoryId)}>
+            <div
+              key={s.taskId}
+              className={`chip${s.done ? ' done' : ''}`}
+              style={catStyle(categories, s.categoryId)}
+              onPointerDown={(e) => !s.done && drag.begin(e, { type: 'sometime', taskId: s.taskId, title: s.title, minutes: s.minutes }, e.currentTarget)}
+            >
               <Check checked={s.done} label={s.title} onToggle={() => onCheckTask(s.taskId, !s.done)} />
               <i className="dot"></i>
               <span>{s.title}</span>
@@ -143,7 +159,7 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
         )}
       </div>
 
-      <div className="grid" style={{ height: totalHeight(segs) }}>
+      <div className="grid" data-drop="grid" style={{ height: totalHeight(segs) }}>
         <Strips segs={segs} y={y} pastEnd={isToday ? nowMin! : isPast ? DAY_TO : DAY_FROM} onOpen={onOpen} />
         {hourLines(segs).map((m) => (
           <div
@@ -169,11 +185,19 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
           </div>
         ))}
         {open.map((b) => (
-          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} />
+          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} begin={drag.begin} />
         ))}
         {rest.map((b, i) => (
-          <Block key={b.key} b={b} col={cols[i]!.col} cols={cols[i]!.cols} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} />
+          <Block
+            key={b.key} b={b} col={cols[i]!.col} cols={cols[i]!.cols} y={y} categories={categories}
+            onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} begin={drag.begin}
+          />
         ))}
+        {ghost && (
+          <div className="ghost" style={{ top: y(ghost.from) + 1, height: Math.max(y(ghost.to) - y(ghost.from) - 3, 20) }}>
+            {fmtRange(ghost.from, ghost.to)}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -193,7 +217,7 @@ function Strips({ segs, y, pastEnd, onOpen }: { segs: Segment[]; y: (m: number) 
     const id = s.id;
     if (!s.open) {
       out.push(
-        <button key={id} className="band" style={{ top, height: h }} aria-label={`Show ${fmtRange(s.from, s.to)}`} onClick={() => onOpen(id, true)}>
+        <button key={id} className="band" data-strip={id} style={{ top, height: h }} aria-label={`Show ${fmtRange(s.from, s.to)}`} onClick={() => onOpen(id, true)}>
           <b>{fmtRange(s.from, s.to)}</b>
           <span>{id === 'early' ? 'Early morning' : 'Late night'}</span>
           <PlusIcon />
@@ -223,14 +247,18 @@ interface BlockProps {
   onCheck: (b: Shown) => void;
   onDetails: (b: Shown, el: HTMLElement) => void;
   onRemove: (b: Shown) => void;
+  begin: BeginDrag;
 }
 
-function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove }: BlockProps) {
+function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, begin }: BlockProps) {
   const top = y(b.startMin);
   const height = Math.max(y(b.endMin) - top - 3, 20);
   const short = height < 37;
+  const moves = movable(b);
+  const minutes = b.endMin - b.startMin;
   const cls = [
-    'block', b.look, b.done && 'done', !b.checkable && 'nocb', b.missed && 'missed', short && 'short', b.parts.length && 'has-parts',
+    'block', b.look, b.done && 'done', !b.checkable && 'nocb', !moves && 'nodrag', b.missed && 'missed', short && 'short',
+    b.parts.length && 'has-parts',
   ].filter(Boolean).join(' ');
   const style = {
     ...catStyle(categories, b.categoryId),
@@ -248,6 +276,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove }: Bl
       tabIndex={0}
       aria-label={`${b.title}, ${fmtRange(b.startMin, b.endMin)}. Details`}
       onClick={(e) => onDetails(b, e.currentTarget)}
+      onPointerDown={(e) => moves && begin(e, { type: 'block', b, title: b.title, minutes }, e.currentTarget)}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
@@ -273,6 +302,17 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove }: Bl
       </div>
       <div className="bm">{b.sub}</div>
       <Del label={`${removeLabel(b)}: ${b.title}`} onClick={() => onRemove(b)} />
+      {moves && (
+        <div
+          className="resize"
+          aria-hidden="true"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            begin(e, { type: 'resize', b, title: b.title, minutes }, e.currentTarget.parentElement!);
+          }}
+        />
+      )}
     </div>
   );
 }

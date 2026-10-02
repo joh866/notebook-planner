@@ -51,7 +51,7 @@ const REFS: { child: TableName; column: string; parent: TableName; cascade: bool
   { child: 'classSkips', column: 'classId', parent: 'classes', cascade: true },
 ];
 
-const tableOf = (name: TableName) => TABLES[name].table as SQLiteTable;
+export const tableOf = (name: TableName) => TABLES[name].table as SQLiteTable;
 const columnsOf = (name: TableName) => getTableColumns(tableOf(name)) as Record<string, SQLiteColumn>;
 const keyOf = (name: TableName, row: Row) => JSON.stringify(TABLES[name].key.map((k) => row[k]));
 

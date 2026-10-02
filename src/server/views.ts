@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
+import { blockLength } from '../core/length';
 import { classesOn, routineOccursOn, slotOn } from '../core/recurrence';
 import { streak } from '../core/streak';
 import { clockOnDay, minutesOnDay, resolveZone } from '../core/time';
@@ -163,7 +164,9 @@ function scheduleFor(ctx: Ctx, date: string): DaySchedule {
     .filter((s) => s.date === date)
     .flatMap((s) => {
       const task = ctx.data.tasks.find((x) => x.id === s.taskId);
-      return task ? [{ taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, rolledFrom: s.rolledFrom }] : [];
+      return task
+        ? [{ taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, rolledFrom: s.rolledFrom, minutes: blockLength(task) }]
+        : [];
     });
   return { date, schedule, deadlines: deadlinesOn(ctx, date), sometime };
 }

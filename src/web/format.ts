@@ -113,3 +113,16 @@ export function shortLoc(loc: string | null): string {
 }
 
 export const monthName = (i: number) => MONTHS[i]!;
+
+/** A tentative event's label after it moves: "Around 7, depends on friends" becomes "Around 8:30pm, depends on friends". */
+export function aroundLabel(label: string | null, m: number): string {
+  const at = `Around ${fmtTime(m)}`;
+  if (label && /^around\b/i.test(label)) return label.replace(/^around[^,]*/i, at);
+  return at;
+}
+
+/** How a routine repeats: "every day", "every Saturday", "every other Saturday", "every Monday and Wednesday". */
+export function repeatWords(r: { repeat: 'daily' | 'weekly'; repeatDays: number[] | null; repeatEvery: number }): string {
+  if (r.repeat === 'daily' || !r.repeatDays?.length) return 'every day';
+  return `every ${r.repeatEvery > 1 ? 'other ' : ''}${joinAnd(r.repeatDays.map((d) => DAYS[d]!))}`;
+}

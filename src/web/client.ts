@@ -1,4 +1,4 @@
-import type { CategoryView, ConditionAnswer, DayView, DecisionResult, SettingsView } from '../shared/api';
+import type { CategoryView, ConditionAnswer, DayView, DecisionResult, DropInput, DropResult, SettingsView } from '../shared/api';
 
 // Talks to the server. The web app never works out the plan itself; it shows what comes back.
 
@@ -58,6 +58,8 @@ export type ClassInput = Omit<ClassRow, 'id' | 'timeZone' | 'categoryId'>;
 export const api = {
   rollover: () => send<Changed<{ moved: string[] }>>('POST', `/api/rollover?${tz()}`),
   undo: (token: string) => send<{ ok: true }>('POST', `/api/undo/${token}`),
+  /** Drag and drop. Positions are minutes on the shown day, in this device's zone. */
+  drop: (body: DropInput) => send<Changed<DropResult>>('POST', `/api/drops?${tz()}`, body),
 
   setTaskDone: (id: string, done: boolean) =>
     send<Changed>('PATCH', `/api/tasks/${id}`, { doneAt: done ? new Date().toISOString() : null }),

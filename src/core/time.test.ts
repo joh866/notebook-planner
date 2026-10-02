@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
-import { clockOnDay, isOnDay, minutesOnDay, parseClock, resolveZone } from './time';
+import { atMinute, clockOf, clockOnDay, isOnDay, minutesOnDay, parseClock, resolveZone } from './time';
 
 const CHI = 'America/Chicago';
 const NY = 'America/New_York';
@@ -61,5 +61,31 @@ describe('minutesOnDay and isOnDay', () => {
     const late = DateTime.fromISO('2026-10-03T02:00', { zone: CHI });
     expect(isOnDay(late, '2026-10-02', CHI)).toBe(true);
     expect(isOnDay(late, '2026-10-03', CHI)).toBe(false);
+  });
+});
+
+describe('atMinute', () => {
+  it('turns a spot on the schedule back into an instant', () => {
+    expect(atMinute('2026-10-02', 15 * 60, CHI).toUTC().toISO()).toBe('2026-10-02T20:00:00.000Z');
+    // After midnight is the next calendar day.
+    expect(atMinute('2026-10-02', 1500, CHI).toUTC().toISO()).toBe('2026-10-03T06:00:00.000Z');
+  });
+
+  it('round-trips with minutesOnDay, including the night daylight saving ends', () => {
+    for (const m of [360, 900, 1439, 1440, 1530, 1620]) {
+      expect(minutesOnDay(atMinute('2026-10-31', m, CHI), '2026-10-31', CHI)).toBe(m);
+      expect(minutesOnDay(atMinute('2026-10-02', m, NY), '2026-10-02', NY)).toBe(m);
+    }
+    // 3pm on Nov 1 is after the change, so it's 21:00 UTC instead of 20:00.
+    expect(atMinute('2026-11-01', 900, CHI).toUTC().toISO()).toBe('2026-11-01T21:00:00.000Z');
+  });
+});
+
+describe('clockOf', () => {
+  it('writes local HH:mm, wrapping after midnight', () => {
+    expect(clockOf(540)).toBe('09:00');
+    expect(clockOf(1335)).toBe('22:15');
+    expect(clockOf(1440)).toBe('00:00');
+    expect(clockOf(1530)).toBe('01:30');
   });
 });

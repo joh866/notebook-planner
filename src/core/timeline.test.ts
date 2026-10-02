@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { BAND_PX, HOUR_PX, columns, hourLines, segments, stepParts, totalHeight, yOf, type SegmentInput } from './timeline';
+import {
+  BAND_PX,
+  DAY_TO,
+  HOUR_PX,
+  columns,
+  dropStart,
+  hourLines,
+  minuteAt,
+  resizedLength,
+  segments,
+  stepParts,
+  totalHeight,
+  yOf,
+  type SegmentInput,
+} from './timeline';
 
 const base: SegmentInput = { wakeMin: 540, bedMin: 1440, items: [], nowMin: null, opened: { early: false, late: false } };
 const state = (input: Partial<SegmentInput>) => segments({ ...base, ...input }).map((s) => [s.id, s.open, s.forced]);
@@ -96,5 +110,55 @@ describe('stepParts', () => {
   it('is empty without a waiting step', () => {
     expect(stepParts(600, [{ title: 'Do the problems', minutes: 60, waiting: false }])).toEqual([]);
     expect(stepParts(600, [{ title: 'Chapter 2', minutes: null, waiting: false }])).toEqual([]);
+  });
+});
+
+describe('minuteAt', () => {
+  it('is the inverse of yOf through folded and open stretches', () => {
+    for (const opened of [{ early: false, late: false }, { early: true, late: true }]) {
+      const segs = segments({ ...base, opened });
+      for (const m of [360, 450, 540, 615, 1000, 1440, 1530, 1620]) expect(minuteAt(segs, yOf(segs, m))).toBeCloseTo(m);
+    }
+  });
+
+  it('stays inside the day above and below the schedule', () => {
+    const segs = segments(base);
+    expect(minuteAt(segs, -40)).toBe(360);
+    expect(minuteAt(segs, totalHeight(segs) + 40)).toBe(1620);
+  });
+});
+
+describe('dropStart', () => {
+  const segs = segments(base);
+
+  it('snaps to 15 minutes', () => {
+    expect(dropStart(segs, 607, 30, null)).toBe(600);
+    expect(dropStart(segs, 608, 30, null)).toBe(615);
+  });
+
+  it('keeps out of folded strips and ends by bedtime when the late strip is folded', () => {
+    expect(dropStart(segs, 400, 30, null)).toBe(540);
+    expect(dropStart(segs, 1430, 60, null)).toBe(1380);
+    const open = segments({ ...base, opened: { early: true, late: true } });
+    expect(dropStart(open, 400, 30, null)).toBe(405);
+    expect(dropStart(open, 1610, 60, null)).toBe(DAY_TO - 60);
+  });
+
+  it('can’t land in the past on today', () => {
+    expect(dropStart(segs, 600, 30, 731)).toBe(735);
+    expect(dropStart(segs, 900, 30, 731)).toBe(900);
+  });
+
+  it('gives null when nothing fits', () => {
+    const late = segments({ ...base, nowMin: 1600 });
+    expect(dropStart(late, 1600, 60, 1600)).toBeNull();
+  });
+});
+
+describe('resizedLength', () => {
+  it('snaps the end, keeps at least 15 minutes, and ends by 3am', () => {
+    expect(resizedLength(600, 668)).toBe(75);
+    expect(resizedLength(600, 590)).toBe(15);
+    expect(resizedLength(1560, 1700)).toBe(DAY_TO - 1560);
   });
 });

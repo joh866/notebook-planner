@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clockMin, deadlineOn, dueLabel, fmtDur, fmtRange, fmtTime, joinAnd, planLabel, planTarget, relWord, shortLoc } from './format';
+import { aroundLabel, clockMin, deadlineOn, dueLabel, fmtDur, fmtRange, fmtTime, joinAnd, planLabel, planTarget, relWord, repeatWords, shortLoc } from './format';
 
 describe('times', () => {
   it('formats clock times and ranges', () => {
@@ -84,5 +84,21 @@ describe('words', () => {
     expect(joinAnd(['a', 'b', 'c'])).toBe('a, b, and c');
     expect(shortLoc('Saieh Hall for Economics 021')).toBe('Saieh 021');
     expect(shortLoc('Home')).toBe('Home');
+  });
+});
+
+describe('drop words', () => {
+  it('updates a tentative event’s “Around” time and keeps the rest', () => {
+    expect(aroundLabel('Around 7, depends on friends', 1230)).toBe('Around 8:30pm, depends on friends');
+    expect(aroundLabel('around 7?', 1260)).toBe('Around 9pm');
+    expect(aroundLabel(null, 1140)).toBe('Around 7pm');
+    expect(aroundLabel('Depends on friends', 1140)).toBe('Around 7pm');
+  });
+
+  it('says how a routine repeats', () => {
+    expect(repeatWords({ repeat: 'daily', repeatDays: null, repeatEvery: 1 })).toBe('every day');
+    expect(repeatWords({ repeat: 'weekly', repeatDays: [6], repeatEvery: 1 })).toBe('every Saturday');
+    expect(repeatWords({ repeat: 'weekly', repeatDays: [6], repeatEvery: 2 })).toBe('every other Saturday');
+    expect(repeatWords({ repeat: 'weekly', repeatDays: [1, 3], repeatEvery: 1 })).toBe('every Monday and Wednesday');
   });
 });
