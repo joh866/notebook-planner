@@ -110,7 +110,8 @@ const blocks: (typeof t.blocks.$inferInsert)[] = [
   { id: 'rso-fair', kind: 'event', title: 'RSO fair', categoryId: 'life', startAt: chicago('2026-10-02', '15:00'), durationMinutes: 60 },
 ];
 
-const defaultSettings: typeof t.settings.$inferInsert = {
+/** The settings row before the user changes anything. */
+export const defaultSettings: typeof t.settings.$inferInsert = {
   id: 1,
   notify: { classes: true, taskStarts: true, deadlines: true, morningSummary: true, planTomorrow: false, checkIns: false },
 };
