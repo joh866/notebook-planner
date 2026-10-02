@@ -8,6 +8,20 @@
       "when": 1790917502532,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790918493568,
+      "tag": "0001_steps_with_waiting",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790918493961,
+      "tag": "0002_seed_v0_4",
+      "breakpoints": true
     }
   ]
 }

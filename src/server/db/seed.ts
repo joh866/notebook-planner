@@ -34,12 +34,21 @@ const classes: (typeof t.classes.$inferInsert)[] = [
 const routines: (typeof t.routines.$inferInsert)[] = [
   { id: 'morning', title: 'Morning routine', categoryId: 'routine', durationMinutes: 30, repeat: 'daily', sortOrder: 0 },
   { id: 'meditate', title: 'Meditate 10 min', categoryId: 'routine', durationMinutes: 10, repeat: 'daily', sortOrder: 1 },
-  { id: 'gratitude', title: 'Gratitude, 5 things', categoryId: 'routine', durationMinutes: 15, repeat: 'daily', showStreak: true, sortOrder: 2 },
+  { id: 'gratitude', title: 'Gratitude, 5 things', categoryId: 'routine', durationMinutes: 5, repeat: 'daily', showStreak: true, sortOrder: 2 },
   { id: 'night', title: 'Night routine and journal', categoryId: 'routine', durationMinutes: 45, repeat: 'daily', sortOrder: 3 },
-  { id: 'laundry', title: 'Laundry', categoryId: 'routine', durationMinutes: 60, repeat: 'weekly', repeatDays: [SAT], sortOrder: 4 },
-  { id: 'dorm', title: 'Clean the dorm', categoryId: 'routine', durationMinutes: 60, repeat: 'weekly', repeatDays: [SAT],
+  { id: 'laundry', title: 'Laundry', categoryId: 'routine', durationMinutes: 140, repeat: 'weekly', repeatDays: [SAT], sortOrder: 4 },
+  { id: 'dorm', title: 'Clean the dorm', categoryId: 'routine', durationMinutes: 30, repeat: 'weekly', repeatDays: [SAT],
     repeatEvery: 2, repeatFrom: '2026-10-03', sortOrder: 5 },
 ];
+
+/** Laundry's steps with waiting time (spec §10). They add up to its 140 minutes. */
+const routineSteps: (typeof t.routineSteps.$inferInsert)[] = [
+  { title: 'Load the washer', minutes: 10 },
+  { title: 'Washing', minutes: 55, waiting: true },
+  { title: 'Move to the dryer', minutes: 5 },
+  { title: 'Drying', minutes: 55, waiting: true },
+  { title: 'Fold and put away', minutes: 15 },
+].map((step, i) => ({ id: `laundry-step-${i + 1}`, routineId: 'laundry', sortOrder: i, ...step }));
 
 const routineSlots: (typeof t.routineSlots.$inferInsert)[] = [
   { id: 'morning-slot', routineId: 'morning', start: '09:00', durationMinutes: 30 },
@@ -69,7 +78,8 @@ const tasks: TaskSeed[] = [
   { id: 'econ-pset', title: 'Problem Set 1', shortName: 'Econ PSet 1', meta: 'ECON 20010', categoryId: 'class', window: 'week',
     dueAt: chicago('2026-10-09', '12:00'), estLow: 120, estHigh: 180, sittingMinutes: 90 },
   { id: 'shopping', title: 'Shopping run', categoryId: 'errand', window: 'week', estLow: 45, estHigh: 75,
-    steps: ['Small towels for gym and bathroom', 'Razor', 'Shower mat (ask roommates about cost and who buys)'] },
+    steps: ['Ask roommates about the shower mat (cost, which one, who buys)', 'Small towels for the gym and bathroom', 'Razor',
+      'Shower mat'] },
   { id: 'container', title: 'Clean the wooden container, store folders', categoryId: 'life', window: 'near', estLow: 20, estHigh: 40 },
   { id: 'quant', title: 'Consolidate the quant plan', meta: 'Or just start the stats course', categoryId: 'growth', window: 'near',
     estLow: 45, estHigh: 90 },
@@ -87,10 +97,13 @@ const tasks: TaskSeed[] = [
     decisionYes: { makeTask: { title: 'Get a foam mattress topper', window: 'soon' } } },
   { id: 'skip-disc', title: 'Skip econ discussion Friday?', meta: 'Ask friends if they’re going', categoryId: 'class', window: 'decide',
     decisionYes: { skipClass: { classId: 'econ-disc', date: '2026-10-02' } } },
+  { id: 'epiphany-build', title: 'Build my own project based on Epiphany?', meta: 'Decide after going through it.',
+    categoryId: 'growth', window: 'decide',
+    decisionYes: { makeTask: { title: 'Build a project based on Epiphany', window: 'soon' } } },
 
   { id: 'number-theory', title: 'Number theory book', categoryId: 'growth', window: 'ongoing', sessionMinutes: 45 },
-  { id: 'epiphany', title: 'Go through the Epiphany ML project', meta: 'Understand it, then maybe build on it',
-    categoryId: 'growth', window: 'ongoing', sessionMinutes: 60 },
+  { id: 'epiphany', title: 'Go through the Epiphany ML project and understand it', categoryId: 'growth', window: 'week',
+    sessionMinutes: 60 },
 ];
 
 const blocks: (typeof t.blocks.$inferInsert)[] = [
@@ -113,6 +126,7 @@ export function seed(db: Db): boolean {
     tx.insert(t.categories).values(categories).run();
     tx.insert(t.classes).values(classes).run();
     tx.insert(t.routines).values(routines).run();
+    tx.insert(t.routineSteps).values(routineSteps).run();
     tx.insert(t.routineSlots).values(routineSlots).run();
     tx.insert(t.conditions).values(conditions).run();
     tasks.forEach(({ steps, ...task }, i) => {

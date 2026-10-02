@@ -30,7 +30,11 @@ TypeScript · React + Vite · plain CSS with variables (no Tailwind) · Hono on 
 
 ## Conventions
 - Durations are whole minutes.
-- Fixed moments (deadlines, class meetings, one-off events) are stored as UTC ISO strings. Times that follow the user wherever they are (routines, wake time, bedtime) are stored as local "HH:mm".
+- One-time moments (a deadline with a time, a one-off event) are stored as UTC ISO strings.
+- Repeating things that happen in Chicago (classes) are stored as clock time plus time zone.
+- Times that follow the user wherever they are (routines, wake time, bedtime) are stored as local "HH:mm".
+- A deadline with no time is stored as a date only.
+- Derived states (overdue, urgency windows) are calculated, never stored.
 - The home time zone is America/Chicago. Use Luxon for all time zone math so daylight saving (it ends Nov 1, 2026) stays correct.
 - A day starts at 4:00 AM local (spec §3).
 - Anything that removes or moves something the user made supports Undo.

@@ -1,6 +1,6 @@
 # Product spec: personal planner
 
-Version 0.3, October 2, 2026. This replaces the September 25 spec from the first attempt.
+Version 0.4, October 2, 2026. This replaces the September 25 spec from the first attempt.
 This file is the source of truth. The latest prototype (`planner-prototype-6.html`) is the visual reference. Where the two disagree, this file wins.
 
 ---
@@ -48,6 +48,12 @@ The engineering practices were good and are worth keeping (section 15).
 - **Web app:** React with Vite. Styles are plain CSS that uses the prototype's CSS variables, so the notebook look carries over exactly (no Tailwind). Installable phone support is added when going online.
 - **Server:** Hono on Node, running locally on the Mac. It's portable to an online host later.
 - **Data:** SQLite through Drizzle, as one file on the Mac for now. All database access lives in one module so it can move to hosted SQLite when going online.
+- **How times are stored:**
+  - One-time moments (a deadline with a time, a one-off event) are stored as exact moments in UTC.
+  - Repeating things that happen in Chicago (classes) are stored as a clock time plus a time zone, so daylight saving and travel both work.
+  - Things that follow you wherever you are (routines, wake time, bedtime) are stored as a plain local clock time.
+  - A deadline with no time is stored as a date only.
+  - Overdue status and urgency windows are never stored. They're calculated from the deadline and the current time.
 - **Shared tools:** Zod for data shapes shared by server and web, Luxon for dates and time zones, and Vitest for tests.
 - **AI:** the Anthropic TypeScript SDK on the server, reading the key from a `.env` file. The model name is also set in `.env`.
 - **Drag and drop:** ported from the prototype's own pointer code, which already handles mouse and touch.
@@ -187,6 +193,7 @@ A line under the header separates it from the content. Below that line:
 | Tentative event ("around 7") | Dashed outline, "Around 7, depends on friends" | Moving it updates "Around X" |
 | Open time | Hatched, behind other blocks | Counts as free time for the planner |
 | Missed task | Red outline, "Not done yet" | A task block whose time has passed today while it's still unchecked |
+| Task with waiting time (laundry) | A light bar spans the whole time. Hands-on parts are solid blocks, and waiting parts are hatched and labeled ("Washing, 55m"). | Other things can be placed during the waiting parts. Moving it moves all the parts together. |
 
 Every block has the following:
 - **Checkbox:** except classes and open time.
@@ -295,6 +302,22 @@ Drops on today can't land in the past. Dragging near the edge scrolls the schedu
 - **Steps:** checked individually.
 - **How long did it take?** When a task with a range estimate is checked off, the app asks "About as planned," "Longer," or "Shorter." This is one tap and optional. Routines, events, and fixed-length sessions never ask. Later, the answers will adjust estimates for similar tasks.
 
+### Deadlines
+
+- A deadline is stored as either an exact moment (when a time was given) or a day only, never both.
+- A day-only deadline means "by the end of that day." It shows as "Due Fri" with no time, sorts after timed deadlines on the same day, and becomes overdue when that day ends at 4am.
+
+### Waiting time inside a task
+
+Some things take a long time but only a little of your attention. Laundry takes 2 to 3 hours, but most of that is waiting for the machines.
+
+- Steps can have a length and be marked as hands-on or waiting.
+  - Laundry: load the washer (10m, hands-on), washing (55m, waiting), move to the dryer (5m, hands-on), drying (55m, waiting), fold and put away (15m, hands-on).
+  - That's about 2h 20m from start to finish, but only about 30m hands-on.
+- The planner treats hands-on parts as busy and waiting parts as free time. It won't put a hands-on part inside a class or event, so you're never in class when the washer finishes.
+- When a waiting part ends, a notification says what's next ("Washer's done. Move your laundry to the dryer.").
+- Each step checks off on its own, and the whole thing is done when the last step is.
+
 ### Rollover
 
 At 4am, any unfinished task that was scheduled on, or committed to, a past day moves to today's Sometime lane, marked "from Thursday." If automatic scheduling is on, the planner also pencils it in.
@@ -344,7 +367,7 @@ The AI returns JSON. Fields are left out when they don't apply.
 - **est:** an honest range in minutes.
 - **sitting:** the length of one work session, for big tasks.
 - **session:** minutes per session, for skill-building items.
-- **steps:** the parts of the task.
+- **steps:** the parts of the task. Each step can have a length in minutes and be marked hands-on or waiting (laundry's wash cycle is waiting).
 - **wait:** a yes/no check-in question.
 - **repeat:** daily, or specific weekdays, weekly or every other week.
 - **date, start, end:** for events and classes.
@@ -392,7 +415,7 @@ Plans the target day (section 7). It:
 
 ### Free time
 
-Free time is from your wake time (or now, plus 10 minutes, if planning today) until bedtime. It excludes classes, events, routines on the schedule, and pinned tasks. There's a 10-minute buffer around each busy block. Open time counts as free. Start times round up to 15 minutes.
+Free time is from your wake time (or now, plus 10 minutes, if planning today) until bedtime. It excludes classes, events, routines on the schedule, and pinned tasks. There's a 10-minute buffer around each busy block. Open time counts as free, and so do the waiting parts of a task (like laundry's wash cycle). Start times round up to 15 minutes.
 
 ### Scoring, current version
 
@@ -446,6 +469,7 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
   - Morning summary.
   - Plan tomorrow (an hour before bedtime).
   - Check-in questions (at most once a day).
+  - When a waiting part ends ("Move your laundry to the dryer").
 
 ## 14. Integrations
 
@@ -498,11 +522,11 @@ Full names: The Elements of Economic Analysis I Honors; Introduction to Proofs i
 ### Routines
 
 - Morning routine: daily at 9am, 30 minutes.
-- Meditate 10 min: daily.
-- Gratitude, 5 things: daily, with a streak.
+- Meditate 10 min: daily, 10 minutes.
+- Gratitude, 5 things: daily, with a streak. About five sentences, so 5 minutes.
 - Night routine and journal: daily at 11pm, 45 minutes.
-- Laundry: every Saturday.
-- Clean the dorm: every other Saturday, starting October 3.
+- Laundry: every Saturday. Steps with waiting time as in section 10: about 2h 20m start to finish, about 30m hands-on.
+- Clean the dorm: every other Saturday, starting October 3, 30 minutes.
 
 ### Tasks, from the October 1 todo
 
@@ -511,15 +535,20 @@ Full names: The Elements of Economic Analysis I Honors; Introduction to Proofs i
 - **Get The Muqaddimah:** this week.
 - **Math PSet 1:** due Wed Oct 7 at 11am. Steps are do the problems, then check answers with a friend.
 - **Econ PSet 1:** due Fri Oct 9 at noon.
-- **Shopping run:** small towels, razor, and shower mat (ask roommates about cost and who buys).
+- **Shopping run:** This week, since your note said "near future," which you defined as about a week. Steps:
+  1. Ask roommates about the shower mat (cost, which one, who buys).
+  2. Small towels for the gym and bathroom.
+  3. Razor.
+  4. Shower mat.
 - **Clean the wooden container and store folders:** today or tomorrow.
 - **Consolidate the quant plan:** today or tomorrow.
 - **Waiting:**
   - Gym and boxing club, once the cold is gone.
   - ARCH reading, if accepted.
   - Resume and internship applications, once the QNet certificate arrives.
-- **Decisions:** new blanket?, foam mattress topper?, skip econ discussion Friday?
-- **Ongoing:** number theory book (45-minute sessions), the Epiphany ML project (1-hour sessions).
+- **Go through the Epiphany ML project and understand it:** This week, for the same "near future" reason, in 1-hour sessions.
+- **Decisions:** new blanket?, foam mattress topper?, skip econ discussion Friday?, build my own project based on Epiphany? (decide after going through it).
+- **Ongoing:** number theory book (45-minute sessions).
 - **Events:** RSO fair, Fri Oct 2 at 3pm.
 
 ## 17. Not now
@@ -538,3 +567,4 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 2, 2026:** v0.4. How times and deadlines are stored. Waiting time inside a task (laundry). Routine lengths. Shopping run steps. Epiphany split into a task and a decision.

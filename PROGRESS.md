@@ -19,6 +19,20 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - Settings.
 
   Use Drizzle migrations. `npm run seed` loads spec §16 and does nothing if data already exists.
+- [x] **2b. Data model update for spec v0.4.** Read the v0.4 change log entry first. Storage choices from step 2 are confirmed, so no changes there.
+  - **Steps with waiting time (spec §10, "Waiting time inside a task").** Add `minutes` (nullable) and `waiting` (hands-on by default) to `task_steps`.
+    - Laundry is a routine, so add a `routine_steps` table with the same columns.
+    - Also add `routine_step_checks` (step, date), so each step checks off on its own each day.
+  - **Seed changes (spec §16):**
+    - Lengths: meditate 10, gratitude 5, and clean the dorm 30.
+    - Laundry: the five steps from §10, which are load the washer (10, hands-on), washing (55, waiting), move to the dryer (5, hands-on), drying (55, waiting), and fold and put away (15, hands-on). Its length is 140.
+    - Shopping run: stays in This week, with the four steps in §16's order.
+    - Epiphany: becomes a This week task, "Go through the Epiphany ML project and understand it," with 1-hour sessions. It's no longer Ongoing.
+    - Add a decision, "Build my own project based on Epiphany?", with the meta "Decide after going through it." Yes makes the task "Build a project based on Epiphany" in Soon, matching the other decisions. Soon is a guess, since the spec doesn't say.
+  - **Migrations:** generate a new migration (`npm run db:generate`). Don't edit `0000_init.sql`.
+    - `data/planner.db` was already seeded with the v0.3 data, and the seed skips a database that has data. So add a custom data migration (`drizzle-kit generate --custom`) that applies the seed changes above to the existing rows, matched by seed id. It must leave alone anything the user has created or changed. Never delete the database.
+  - **Tests:** the seed test's task count goes from 17 to 18 because spec v0.4 adds a decision. The user approved this change, so it's allowed under rule 4.
+    - Add tests for the laundry steps (total 140, waiting total 110), for the new lengths, and for the migration updating a v0.3-seeded database.
 - [ ] **3. Core: time and recurrence.** Pure functions in `src/core`, with tests:
   - The 4am day boundary.
   - Time zones, including the Nov 1, 2026 daylight saving change and travel (a 2pm Chicago class shows at 3pm in New York, while a 9am routine stays at 9am).
@@ -71,4 +85,5 @@ Ideas and annoyances from using the app. Add them here. Don't fix them in the mi
 ## Notes
 Agents add short notes here when a step is done.
 - Step 1: Vite (5173, root `src/web`) proxies `/api` to Hono (8787, override with `API_PORT`, not `PORT`, since the preview pane sets `PORT`). `src/core/look.ts` decides day/night (tested); ESLint blocks server/web/db imports in `src/core`. The header date uses a simple 4-hour offset for the 4am boundary; step 3 replaces it with the core function. Phone layout is a `max-width:700px` media query. SQLite/Drizzle are added in step 2 and the Anthropic SDK in step 10.
-- Step 2: Drizzle schema in `src/server/db/schema.ts`, migrations in `drizzle/` (regenerate with `npm run db:generate`), applied by `openDb()` in `client.ts` (tests use `openDb(':memory:')`). Deadlines are `due_at` (UTC, time given) or `due_date` (day only), never both. Classes store Chicago wall-clock `HH:mm` plus a `time_zone` column. Routine times are `routine_slots` with per-day `routine_slot_exceptions` (skip or move). Overdue isn't stored; it's derived. Settings are one row (id 1). Weekdays are 0–6 with Sunday as 0. The seed fills an empty database only. Seed choices not in the spec: meditate is 10 min, gratitude 15, laundry and dorm 60. Shopping is This week, and Epiphany is Ongoing per §16 (the prototype had Soon).
+- Step 2: Drizzle schema in `src/server/db/schema.ts`, migrations in `drizzle/` (regenerate with `npm run db:generate`), applied by `openDb()` in `client.ts` (tests use `openDb(':memory:')`). Deadlines are `due_at` (UTC, time given) or `due_date` (day only), never both. Classes store Chicago wall-clock `HH:mm` plus a `time_zone` column. Routine times are `routine_slots` with per-day `routine_slot_exceptions` (skip or move). Overdue isn't stored; it's derived. Settings are one row (id 1). Weekdays are 0–6 with Sunday as 0. The seed fills an empty database only. Seed choices made here (meditate 10 min, gratitude 15, laundry and dorm 60, Epiphany Ongoing) are replaced by spec v0.4. See step 2b.
+- Step 2b: `task_steps` gained `minutes` and `waiting`. New `routine_steps` and `routine_step_checks` tables. `0001` is the schema change. `0002_seed_v0_4.sql` is a guarded data migration: it changes a seed row only if the row still has its exact v0.3 values, and it adds nothing to an empty database, so the seed still runs. Its test loads `tests/fixtures/seed-v0.3.sql` (the step 2 seed as a dump), migrates it, and checks it matches a fresh v0.4 seed. The "does nothing when data exists" test went from 16 to 17 tasks, a direct result of the approved 17→18 change. Epiphany's old meta ("maybe build on it") was cleared, since the new decision covers it. `data/planner.db` migrates the next time `openDb()` runs on it (`npm run seed` now, or the API from step 4).

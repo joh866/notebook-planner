@@ -70,6 +70,10 @@ export const taskSteps = sqliteTable('task_steps', {
   id: id(),
   taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
+  /** Length of this step, when known (spec §10, "Waiting time inside a task"). */
+  minutes: integer('minutes'),
+  /** True for waiting parts (a wash cycle), which count as free time. Hands-on by default. */
+  waiting: integer('waiting', { mode: 'boolean' }).notNull().default(false),
   done: integer('done', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
 });
@@ -98,6 +102,26 @@ export const routineChecks = sqliteTable(
     date: text('date').notNull(),
   },
   (t) => [primaryKey({ columns: [t.routineId, t.date] })],
+);
+
+/** Steps of a routine, like laundry's wash and dry cycles. Same shape as task steps. */
+export const routineSteps = sqliteTable('routine_steps', {
+  id: id(),
+  routineId: text('routine_id').notNull().references(() => routines.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  minutes: integer('minutes'),
+  waiting: integer('waiting', { mode: 'boolean' }).notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+/** A routine step checked off on a given day. Each step checks off on its own. */
+export const routineStepChecks = sqliteTable(
+  'routine_step_checks',
+  {
+    stepId: text('step_id').notNull().references(() => routineSteps.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.stepId, t.date] })],
 );
 
 /** A routine's time on the schedule, on every day it occurs. */
