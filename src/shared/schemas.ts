@@ -30,5 +30,7 @@ export const NotifySchema = z.object({
   morningSummary: z.boolean(),
   planTomorrow: z.boolean(),
   checkIns: z.boolean(),
+  /** When a waiting part ends ("Move your laundry to the dryer"). */
+  waitingEnds: z.boolean(),
 });
 export type Notify = z.infer<typeof NotifySchema>;

@@ -16,6 +16,7 @@ import { Month } from './Month';
 import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
 import { Rail } from './Rail';
 import { Schedule, type Shown } from './Schedule';
+import { Settings } from './Settings';
 import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
 import { usePhone } from './usePhone';
 import { PhoneWeekChoice, Week, WeekList, type PhoneWeek } from './Week';
@@ -56,6 +57,7 @@ export function App() {
   const [openId, setOpenId] = useState<string | null>(null);
   /** The class dialog: a class id to edit, or 'new'. */
   const [classEdit, setClassEdit] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   /** Cards the add box just made, which flash briefly (spec §11, "After adding"). */
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
@@ -74,6 +76,7 @@ export function App() {
   const closePop = useCallback(() => setPop(null), []);
   const closeCatPick = useCallback(() => setCatPick(null), []);
   const closeClassEdit = useCallback(() => setClassEdit(null), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   // Only the latest request is shown, so a slow older response can't replace a newer day.
   const latest = useRef(0);
@@ -151,7 +154,7 @@ export function App() {
   }, [view, phone]);
 
   // Escape closes the drawer, unless a popover, picker, or dialog is open (they close first).
-  const overlayOpen = !!(pop || catPick || classEdit);
+  const overlayOpen = !!(pop || catPick || classEdit || settingsOpen);
   useEffect(() => {
     if (!phone || drawer === 'peek' || overlayOpen) return;
     const key = (e: KeyboardEvent) => {
@@ -473,7 +476,11 @@ export function App() {
           }}
           onShift={shift}
           onToday={() => go(null)}
-          onSettings={() => say('Settings come in a later step.')}
+          onSettings={() => {
+            setPop(null);
+            setCatPick(null);
+            setSettingsOpen(true);
+          }}
         />
         <Rail month={data.month} coming={data.coming} selected={day.date} categories={categories} onOpenDay={openDay} />
         <main className="main">
@@ -573,6 +580,18 @@ export function App() {
           onPick={(id) => pickCategory(catPick.t, id)}
           onNew={(name) => void newCategory(catPick.t, name)}
           onClose={closeCatPick}
+        />
+      )}
+      {settingsOpen && (
+        <Settings
+          settings={settings}
+          categories={categories}
+          covered={!!classEdit}
+          change={change}
+          say={say}
+          onEditClass={setClassEdit}
+          onDayTimes={() => setOpened({ early: false, late: false })}
+          onClose={closeSettings}
         />
       )}
       {classEdit && (

@@ -12,6 +12,9 @@ import type {
   SettingsView,
   WeekView,
 } from '../shared/api';
+import type { Notify } from '../shared/schemas';
+
+export type SettingsPatch = Partial<Omit<SettingsView, 'notify'>> & { notify?: Partial<Notify> };
 
 // Talks to the server. The web app never works out the plan itself; it shows what comes back.
 
@@ -103,6 +106,12 @@ export const api = {
   deleteStep: (id: string) => send<Changed>('DELETE', `/api/task-steps/${id}`),
 
   addCategory: (name: string, color: string) => send<Changed<CategoryView>>('POST', '/api/categories', { name, color }),
+  patchCategory: (id: string, body: { name?: string; color?: string }) => send<Changed<CategoryView>>('PATCH', `/api/categories/${id}`, body),
+  /** Unfinished tasks in each category. */
+  categoryCounts: () => send<Record<string, number>>('GET', '/api/category-counts'),
+
+  /** The settings sheet (spec §13). */
+  patchSettings: (body: SettingsPatch) => send<Changed<SettingsView>>('PATCH', '/api/settings', body),
 
   answerCondition: (id: string) => send<Changed<ConditionAnswer>>('POST', `/api/conditions/${id}/answer`),
   snoozeCondition: (id: string, until: string) => send<Changed>('PATCH', `/api/conditions/${id}`, { snoozedUntil: until }),
@@ -120,6 +129,7 @@ export const api = {
 
   setClassSkipped: (classId: string, homeDate: string, skipped: boolean) =>
     send<Changed>(skipped ? 'PUT' : 'DELETE', `/api/class-skips/${classId}/${homeDate}`),
+  listClasses: () => send<ClassRow[]>('GET', '/api/classes'),
   getClass: (id: string) => send<ClassRow>('GET', `/api/classes/${id}`),
   addClass: (body: ClassInput) => send<Changed<ClassRow>>('POST', '/api/classes', { ...body, categoryId: 'class' }),
   patchClass: (id: string, body: ClassInput) => send<Changed<ClassRow>>('PATCH', `/api/classes/${id}`, body),

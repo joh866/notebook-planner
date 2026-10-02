@@ -113,7 +113,7 @@ const blocks: (typeof t.blocks.$inferInsert)[] = [
 /** The settings row before the user changes anything. */
 export const defaultSettings: typeof t.settings.$inferInsert = {
   id: 1,
-  notify: { classes: true, taskStarts: true, deadlines: true, morningSummary: true, planTomorrow: false, checkIns: false },
+  notify: { classes: true, taskStarts: true, deadlines: true, morningSummary: true, planTomorrow: false, checkIns: false, waitingEnds: true },
 };
 
 /** Loads the starting data. Does nothing if the database already has any data. Returns whether it seeded. */

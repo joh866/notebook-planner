@@ -79,6 +79,16 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
     }));
   });
 
+  /** Unfinished tasks in each category, for the settings sheet (spec §13). */
+  app.get('/api/category-counts', (c) => {
+    const counts: Record<string, number> = {};
+    for (const task of db.select().from(t.tasks).all()) {
+      if (task.doneAt || !task.categoryId) continue;
+      counts[task.categoryId] = (counts[task.categoryId] ?? 0) + 1;
+    }
+    return c.json(counts);
+  });
+
   registerResources(app, db, run);
   registerAnswers(app, run, now);
   registerDrops(app, db, run, now);

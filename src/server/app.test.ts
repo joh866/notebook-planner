@@ -434,6 +434,28 @@ describe('categories, check-ins, and settings', () => {
     expect((await get<{ wakeTime: string }>('/api/settings')).wakeTime).toBe('09:00');
   });
 
+  it('fills in notifications added after the row was saved', async () => {
+    const res = await call<{ item: { notify: Record<string, boolean> } }>('PATCH', '/api/settings', { notify: { waitingEnds: false } });
+    expect(res.body.item.notify).toMatchObject({ waitingEnds: false, classes: true });
+    expect((await get<{ notify: Record<string, boolean> }>('/api/settings')).notify.waitingEnds).toBe(false);
+  });
+
+  it('counts unfinished tasks in each category', async () => {
+    const before = await get<Record<string, number>>('/api/category-counts');
+    expect(before.errand).toBeGreaterThan(0);
+    const errand = (await get<{ id: string; categoryId: string | null }[]>('/api/tasks')).find((x) => x.categoryId === 'errand')!;
+    await call('PATCH', `/api/tasks/${errand.id}`, { doneAt: FRI_3PM.toUTC().toISO() });
+    expect((await get<Record<string, number>>('/api/category-counts')).errand ?? 0).toBe(before.errand! - 1);
+  });
+
+  it('saves and clears the Canvas feed link', async () => {
+    await call('PATCH', '/api/settings', { canvasFeedUrl: 'https://canvas.uchicago.edu/feeds/calendars/user_abc.ics' });
+    expect((await get<{ canvasFeedUrl: string | null }>('/api/settings')).canvasFeedUrl).toContain('canvas');
+    expect((await call('PATCH', '/api/settings', { canvasFeedUrl: 'not a link' })).status).toBe(400);
+    await call('PATCH', '/api/settings', { canvasFeedUrl: null });
+    expect((await get<{ canvasFeedUrl: string | null }>('/api/settings')).canvasFeedUrl).toBeNull();
+  });
+
   it('uses a fixed time zone setting over the device zone', async () => {
     await call('PATCH', '/api/settings', { timeZone: 'America/New_York' });
     expect((await get<DayView>('/api/day?tz=America/Los_Angeles')).zone).toBe('America/New_York');

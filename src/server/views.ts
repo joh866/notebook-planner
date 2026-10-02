@@ -53,12 +53,14 @@ function load(db: Db) {
 }
 type Data = ReturnType<typeof load>;
 
-/** The settings row, created with defaults the first time. */
+/** The settings row, created with defaults the first time. Notifications added later get their defaults. */
 export function getSettings(db: Db) {
-  const row = db.select().from(t.settings).get();
-  if (row) return row;
-  db.insert(t.settings).values(defaultSettings).onConflictDoNothing().run();
-  return db.select().from(t.settings).get()!;
+  let row = db.select().from(t.settings).get();
+  if (!row) {
+    db.insert(t.settings).values(defaultSettings).onConflictDoNothing().run();
+    row = db.select().from(t.settings).get()!;
+  }
+  return { ...row, notify: { ...defaultSettings.notify, ...row.notify } };
 }
 
 interface Ctx {

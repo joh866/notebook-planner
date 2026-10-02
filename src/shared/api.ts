@@ -9,6 +9,7 @@ import {
   WindowSchema,
   type BlockKind,
   type DecisionYes,
+  type Notify,
   type Window,
 } from './schemas';
 
@@ -523,6 +524,8 @@ export interface SettingsView {
   homeTimeZone: string;
   autoSchedule: boolean;
   weekStart: number;
+  notify: Notify;
+  canvasFeedUrl: string | null;
 }
 
 /** GET /api/categories. Built-ins have no color; they use the palette in spec §4. */
