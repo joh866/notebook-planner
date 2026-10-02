@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DateTime } from 'luxon';
+import { dayOf } from '../core/day';
 import { lookForHour } from '../core/look';
-
-const DAY_START_HOURS = 4; // spec §3: before 4am counts as the previous night.
 
 function useNow(): DateTime {
   const [now, setNow] = useState(() => DateTime.now());
@@ -22,7 +21,8 @@ function fmtClock(t: DateTime): string {
 export function App() {
   const now = useNow();
   const look = lookForHour(now.hour);
-  const today = now.minus({ hours: DAY_START_HOURS });
+  // Spec §3: before 4am counts as the previous night.
+  const today = DateTime.fromISO(dayOf(now, now.zoneName ?? 'local'));
 
   useEffect(() => {
     document.body.dataset.mode = look;
