@@ -54,12 +54,14 @@ const MOUSE_START_PX = 5;
 const TOUCH_SLOP_PX = 10;
 /** Hovering over a folded strip this long opens it. */
 const STRIP_OPEN_MS = 350;
-/** Dragging this close to the top or bottom of the window scrolls it. */
+/** Dragging this close to the top or bottom of the scrolling area scrolls it. */
 const EDGE_PX = 56;
 
 export interface DragOptions {
   geometry: () => Geometry | null;
-  onStart: () => void;
+  onStart: (item: DragItem) => void;
+  /** After every started drag, dropped or not. */
+  onEnd: () => void;
   onDrop: (item: DragItem, target: DropTarget) => void;
   onOpenStrip: (id: 'early' | 'late') => void;
 }
@@ -95,6 +97,20 @@ function swallowNextClick() {
   };
   window.addEventListener('click', stop, true);
   setTimeout(() => window.removeEventListener('click', stop, true), 0);
+}
+
+/**
+ * What scrolls during a drag: the page on wide screens, or the content area on the phone, where
+ * the bottom stops at the task drawer.
+ */
+function scrollArea(): { el: Element; top: number; bottom: number } {
+  const main = document.querySelector('.main');
+  if (main && getComputedStyle(main).overflowY !== 'visible') {
+    const r = main.getBoundingClientRect();
+    const drawer = document.querySelector('.tasks.drawer');
+    return { el: main, top: r.top, bottom: drawer ? Math.min(r.bottom, drawer.getBoundingClientRect().top) : r.bottom };
+  }
+  return { el: document.scrollingElement ?? document.documentElement, top: 0, bottom: window.innerHeight };
 }
 
 class DragController {
@@ -158,7 +174,7 @@ class DragController {
   private start() {
     const s = this.s!;
     s.started = true;
-    this.opts().onStart();
+    this.opts().onStart(s.item);
     document.body.classList.add('is-dragging');
     if (s.item.type !== 'resize') {
       s.el.classList.add('dragging');
@@ -225,10 +241,9 @@ class DragController {
   private scroll = () => {
     const s = this.s;
     if (!s?.started) return;
-    const sc = document.scrollingElement ?? document.documentElement;
-    const bottom = window.innerHeight;
+    const { el: sc, top, bottom } = scrollArea();
     let dy = 0;
-    if (s.y < EDGE_PX && s.y > -40) dy = -Math.ceil((EDGE_PX - s.y) / 5);
+    if (s.y < top + EDGE_PX && s.y > top - 40) dy = -Math.ceil((top + EDGE_PX - s.y) / 5);
     else if (s.y > bottom - EDGE_PX && s.y < bottom + 40) dy = Math.ceil((s.y - (bottom - EDGE_PX)) / 5);
     if (dy) {
       sc.scrollTop += dy;
@@ -271,7 +286,10 @@ class DragController {
     window.removeEventListener('pointercancel', this.cancel);
     window.removeEventListener('keydown', this.key);
     this.s = null;
-    if (s.started) this.show(null);
+    if (s.started) {
+      this.show(null);
+      this.opts().onEnd();
+    }
   }
 }
 

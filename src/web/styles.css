@@ -1,4 +1,4 @@
-/* Variables, fonts, and styles come from design/prototype-6.html. Phone rules use a 700px media query. */
+/* Variables, fonts, and styles come from design/prototype-6.html. Phone rules use a 700px media query (usePhone.ts matches it). */
 :root {
   --hand:'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
   --body:'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -348,12 +348,58 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .mo-cell .ev.quiet { color:var(--muted); }
 .mo-cell .ev.done { text-decoration:line-through; }
 
+/* ---------- Week: phone list ---------- */
+.viewbar { display:flex; justify-content:flex-end; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+.segc { display:flex; border:1px solid var(--card-border); border-radius:8px; overflow:hidden; flex:none; }
+.segc button { border:0; background:var(--card); padding:4px 10px; font-size:13px; }
+.segc button + button { border-left:1px solid var(--card-border); }
+.segc button[aria-pressed="true"] { background:var(--hl); font-weight:700; }
+.wk-stack { display:flex; flex-direction:column; gap:8px; }
+.wk-card { border:1.5px solid var(--frame); background:var(--panel); border-radius:8px; padding:8px 12px 10px; cursor:pointer; scroll-margin-top:8px; }
+.wk-card:hover { background-color:var(--hover); }
+.wk-card.is-today { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+.wk-card-h { display:flex; align-items:baseline; gap:8px; margin-bottom:4px; }
+.wk-card-h b { font-family:var(--hand); font-size:26px; line-height:1; }
+.wk-card-h span { color:var(--muted); font-size:13px; }
+.wk-row { display:flex; gap:8px; font-size:13px; padding:2px 0; align-items:baseline; }
+.wk-row .tm { width:66px; flex:none; color:var(--muted); font-size:12px; }
+.wk-row i { width:7px; height:7px; border-radius:50%; background:var(--cat); flex:none; transform:translateY(-1px); }
+.wk-row.due { color:var(--red); font-weight:700; }
+.wk-row.skipped span:last-child, .wk-row.done span:last-child { text-decoration:line-through; color:var(--muted); }
+.wk-none { font-size:12.5px; color:var(--muted); }
+
+/* ---------- Month: phone ---------- */
+.mo-dots { display:flex; justify-content:center; gap:3px; margin-top:4px; min-height:6px; }
+.mo-dots i { width:6px; height:6px; border-radius:50%; background:var(--cat); flex:none; }
+.mo-dots i.is-due { background:var(--red); }
+.agenda { margin-top:16px; }
+.agenda h3 { font-family:var(--hand); font-size:26px; font-weight:600; margin-bottom:4px; }
+
 /* ---------- Phone ---------- */
+.handle, .backdrop { display:none; }
 @media (max-width:700px) {
-  .device { padding:14px 12px 40px; }
-  .screen { display:flex; flex-direction:column; gap:14px; }
-  .tasks { position:static; max-height:none; }
-  .tasks-inner { overflow:visible; }
+  /* The screen fills the window. The header stays put, the content scrolls under it, and the tasks are a drawer. */
+  body { background-image:none; }
+  .device { padding:0; }
+  /* clip, not just hidden, so scrollIntoView can't scroll the screen itself and push the header off. */
+  .screen { height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; overflow:clip; position:relative; background:var(--bg); }
+  .top { padding:14px 14px 4px; margin-bottom:0; flex:none; }
+  .main { flex:1; min-height:0; overflow:auto; padding:6px 12px 90px; background-image:var(--dotbg); background-size:20px 20px; background-attachment:local; }
+  .screen:not([data-view="day"]) .main { padding-bottom:24px; }
+  .screen[data-wk="grid"][data-view="week"] .main { overflow:hidden; display:flex; flex-direction:column; padding-bottom:12px; }
+  .screen[data-wk="grid"][data-view="week"] .wk-box { flex:1; min-height:0; max-height:none; }
+  .backdrop { display:block; position:absolute; inset:0; z-index:25; background:var(--scrim); }
+  .tasks.drawer {
+    position:absolute; left:0; right:0; bottom:0; top:auto; z-index:30; height:64px; max-height:none; display:flex; flex-direction:column;
+    border:0; border-top:1.5px solid var(--frame); border-radius:22px 22px 0 0; box-shadow:0 -8px 26px rgba(0,0,0,.14);
+  }
+  .tasks.drawer .tasks-inner { flex:1; min-height:0; overflow:auto; padding:0 16px 24px; }
+  .handle {
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; flex:none; height:62px;
+    font-family:var(--hand); font-size:22px; font-weight:600; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none;
+  }
+  .handle .grab { width:40px; height:4px; border-radius:2px; background:var(--frame); }
+  .toast { bottom:80px; width:max-content; }
   .dayview { padding:10px 8px 14px; }
   .rightcluster { width:100%; justify-content:space-between; }
   .tabs { flex:1; }
@@ -373,12 +419,10 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
   .clock { font-size:22px; }
   .wide-only { display:none; }
   .phone-only { display:inline; }
-  /* Step 9 adds the phone week list and the compact month. Until then the grid swipes sideways. */
-  .wk-box { max-height:calc(100vh - 170px); min-height:0; --gut:44px; --col:112px; }
+  .wk-box { max-height:calc(100dvh - 190px); min-height:0; --gut:44px; --col:112px; }
   .month-grid { gap:3px; }
-  .mo-cell { min-height:50px; padding:4px 2px; }
-  .mo-cell .n { font-size:19px; text-align:center; margin-bottom:0; }
-  .mo-cell .ev { font-size:10px; }
+  .mo-cell { min-height:50px; padding:4px 2px; text-align:center; }
+  .mo-cell .n { font-size:19px; margin-bottom:0; }
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; animation:none !important; } }

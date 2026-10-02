@@ -1,9 +1,7 @@
 import { DateTime } from 'luxon';
 import { monthCells } from '../core/day';
 import type { AgendaView, CategoryView, MonthView } from '../shared/api';
-import { agendaDayLabel, agendaLines } from './agenda';
-import { catStyle } from './cats';
-import { dayButton } from './dayButton';
+import { AgendaList } from './AgendaList';
 import { longDate } from './format';
 
 const LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -23,7 +21,6 @@ export function Rail({ month, coming, selected, categories, onOpenDay }: Props) 
   const ws = month.weekStart;
   const cells = monthCells(month.month, ws);
   const due = new Set(month.days.filter((d) => d.deadlines.some((x) => !x.done)).map((d) => d.date));
-  const days = coming.days.map((d) => ({ date: d.date, lines: agendaLines(d) })).filter((d) => d.lines.length);
 
   return (
     <aside className="rail" aria-label="Calendar and what’s coming up">
@@ -46,18 +43,7 @@ export function Rail({ month, coming, selected, categories, onOpenDay }: Props) 
       </div>
       <div className="rail-box">
         <div className="rail-h">Coming up</div>
-        {days.length === 0 && <div className="cu-empty">Nothing coming up in the next 10 days.</div>}
-        {days.map((d) => (
-          <div key={d.date} className="cu-day" {...dayButton(d.date, onOpenDay)}>
-            <div className="cu-date">{agendaDayLabel(coming.today, d.date)}</div>
-            {d.lines.map((l) => (
-              <div key={l.key} className={`cu-item${l.due ? ' is-due' : ''}`} style={catStyle(categories, l.categoryId)}>
-                {!l.due && <i />}
-                <span>{l.text}</span>
-              </div>
-            ))}
-          </div>
-        ))}
+        <AgendaList today={coming.today} days={coming.days} categories={categories} empty="Nothing coming up in the next 10 days." onOpenDay={onOpenDay} />
       </div>
     </aside>
   );

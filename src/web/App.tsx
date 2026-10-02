@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DateTime } from 'luxon';
 import { addDays } from '../core/day';
 import { lookForHour } from '../core/look';
@@ -8,6 +8,7 @@ import { categoryName, catName, nextColor } from './cats';
 import { ClassDialog, classTitle } from './ClassDialog';
 import { api, loadAll, type Changed, type Loaded } from './client';
 import { useDrag, type DragItem, type DropTarget, type Geometry } from './drag';
+import type { DrawerStop } from './drawer';
 import { aroundLabel, fmtDur, fmtTime, joinAnd, relWord, repeatWords } from './format';
 import { Header, type View } from './Header';
 import { Month } from './Month';
@@ -15,7 +16,8 @@ import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
 import { Rail } from './Rail';
 import { Schedule, type Shown } from './Schedule';
 import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
-import { Week } from './Week';
+import { usePhone } from './usePhone';
+import { PhoneWeekChoice, Week, WeekList, type PhoneWeek } from './Week';
 
 function useNow(): DateTime {
   const [now, setNow] = useState(() => DateTime.now());
@@ -27,6 +29,16 @@ function useNow(): DateTime {
 }
 
 let toastId = 0;
+
+const PHONE_WEEK_KEY = 'planner.phoneWeek';
+/** Until one is picked (spec §8), the phone week is one day per row, with the time grid a tap away. */
+function savedPhoneWeek(): PhoneWeek {
+  try {
+    return localStorage.getItem(PHONE_WEEK_KEY) === 'grid' ? 'grid' : 'list';
+  } catch {
+    return 'list';
+  }
+}
 
 export function App() {
   const now = useNow();
@@ -44,6 +56,11 @@ export function App() {
   /** The class dialog: a class id to edit, or 'new'. */
   const [classEdit, setClassEdit] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const phone = usePhone();
+  const [drawer, setDrawer] = useState<DrawerStop>('peek');
+  /** The drawer's stop before a drag closed it, to reopen afterward. */
+  const drawerBeforeDrag = useRef<DrawerStop | null>(null);
+  const [phoneWeek, setPhoneWeek] = useState<PhoneWeek>(savedPhoneWeek);
   const scrolled = useRef(false);
   const geometry = useRef<Geometry | null>(null);
 
@@ -111,6 +128,28 @@ export function App() {
   const today = data?.day.today;
   const date = data?.day.date;
   const nowMin = data && date === today ? minutesOnDay(now, data.day.date, zone) : null;
+
+  // On the phone each view opens at its top, and the day scrolls to now again.
+  const lastView = useRef(view);
+  useLayoutEffect(() => {
+    if (lastView.current === view) return;
+    lastView.current = view;
+    if (!phone) return;
+    const main = document.querySelector('.main');
+    if (main) main.scrollTop = 0;
+    if (view === 'day') scrolled.current = false;
+  }, [view, phone]);
+
+  // Escape closes the drawer, unless a popover, picker, or dialog is open (they close first).
+  const overlayOpen = !!(pop || catPick || classEdit);
+  useEffect(() => {
+    if (!phone || drawer === 'peek' || overlayOpen) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) setDrawer('peek');
+    };
+    document.addEventListener('keydown', key);
+    return () => document.removeEventListener('keydown', key);
+  }, [phone, drawer, overlayOpen]);
 
   useEffect(() => {
     if (scrolled.current || !data || view !== 'day') return;
@@ -284,9 +323,18 @@ export function App() {
 
   const drag = useDrag({
     geometry: () => geometry.current,
-    onStart: () => {
+    onStart: (item) => {
       setPop(null);
       setCatPick(null);
+      // Dragging a task out of the drawer closes it, so the schedule is free for the drop (spec §5).
+      if (phone && item.type !== 'block' && item.type !== 'resize' && drawer !== 'peek') {
+        drawerBeforeDrag.current = drawer;
+        setDrawer('peek');
+      }
+    },
+    onEnd: () => {
+      if (drawerBeforeDrag.current) setDrawer(drawerBeforeDrag.current);
+      drawerBeforeDrag.current = null;
     },
     onDrop: (item, target) => void dropped(item, target),
     onOpenStrip: (id) => setOpened((o) => ({ ...o, [id]: true })),
@@ -361,7 +409,7 @@ export function App() {
 
   return (
     <div className="device">
-      <div className="screen" data-view={view}>
+      <div className="screen" data-view={view} data-wk={phone ? phoneWeek : undefined}>
         <Header
           view={view}
           date={day.date}
@@ -402,20 +450,40 @@ export function App() {
             />
           ) : view === 'week' ? (
             data.week ? (
-              <Week
-                week={data.week}
-                settings={settings}
-                categories={categories}
-                nowMin={minutesOnDay(now, day.today, zone)}
-                onOpenDay={openDay}
-              />
+              <>
+                {phone && (
+                  <PhoneWeekChoice
+                    value={phoneWeek}
+                    onChange={(v) => {
+                      setPhoneWeek(v);
+                      try {
+                        localStorage.setItem(PHONE_WEEK_KEY, v);
+                      } catch {
+                        // Not saved; it still applies until the page reloads.
+                      }
+                    }}
+                  />
+                )}
+                {phone && phoneWeek === 'list' ? (
+                  <WeekList week={data.week} categories={categories} onOpenDay={openDay} />
+                ) : (
+                  <Week
+                    week={data.week}
+                    settings={settings}
+                    categories={categories}
+                    nowMin={minutesOnDay(now, day.today, zone)}
+                    onOpenDay={openDay}
+                  />
+                )}
+              </>
             ) : (
               <p className="loading">Loading…</p>
             )
           ) : (
-            <Month month={data.month} categories={categories} onOpenDay={openDay} />
+            <Month month={data.month} categories={categories} phone={phone} onOpenDay={openDay} />
           )}
         </main>
+        {phone && view === 'day' && drawer !== 'peek' && <div className="backdrop" onClick={() => setDrawer('peek')} />}
         {view === 'day' && (
           <TaskPanel
             day={day}
@@ -428,6 +496,7 @@ export function App() {
             onToggleOpen={(id) => setOpenId((o) => (o === id ? null : id))}
             actions={actions}
             drag={{ begin: drag.begin, over: drag.view?.target?.kind === 'tasks' }}
+            drawer={phone ? { stop: drawer, onStop: setDrawer } : undefined}
           />
         )}
       </div>

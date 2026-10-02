@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { DateTime } from 'luxon';
 import { weekday } from '../core/day';
 import { WEEK_HOUR_PX, columns, weekHours } from '../core/timeline';
 import type { CategoryView, SettingsView, WeekView } from '../shared/api';
@@ -7,6 +8,7 @@ import { catStyle } from './cats';
 import { dayButton } from './dayButton';
 import { clockMin, fmtRange, fmtTime, longDate } from './format';
 import { shown } from './Schedule';
+import { weekRows } from './weekList';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -111,5 +113,57 @@ export function Week({ week, settings, categories, nowMin, onOpenDay }: Props) {
         })}
       </div>
     </section>
+  );
+}
+
+export type PhoneWeek = 'list' | 'grid';
+
+/** The phone week as one card per day, listing times and titles (spec §8, "Week, phone"). Opens scrolled to today. */
+export function WeekList({ week, categories, onOpenDay }: { week: WeekView; categories: CategoryView[]; onOpenDay: (date: string) => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const { today } = week;
+  useLayoutEffect(() => {
+    box.current?.querySelector('.wk-card.is-today')?.scrollIntoView({ block: 'start' });
+  }, [week.start]);
+
+  return (
+    <section className="wk-stack" ref={box} aria-label={`Week of ${longDate(week.start)}`}>
+      {week.days.map((d) => {
+        const rows = weekRows(d);
+        const dt = DateTime.fromFormat(d.date, 'yyyy-MM-dd');
+        return (
+          <div key={d.date} className={`wk-card${d.date === today ? ' is-today' : ''}`} {...dayButton(d.date, onOpenDay)}>
+            <div className="wk-card-h">
+              <b>{dt.toFormat('cccc')}</b>
+              <span>{dt.toFormat('LLL d')}{d.date === today ? ', today' : ''}</span>
+            </div>
+            {rows.length === 0 && <div className="wk-none">Nothing scheduled</div>}
+            {rows.map((r) => (
+              <div key={r.key} className={`wk-row ${r.look}${r.done ? ' done' : ''}`} style={r.look === 'due' ? undefined : catStyle(categories, r.categoryId)}>
+                <span className="tm">{r.time}</span>
+                {r.look !== 'due' && <i />}
+                <span>{r.text}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+/** Both phone weeks stay until one is picked (spec §8). */
+export function PhoneWeekChoice({ value, onChange }: { value: PhoneWeek; onChange: (v: PhoneWeek) => void }) {
+  const opts: [PhoneWeek, string][] = [['list', 'One day per row'], ['grid', 'Time grid']];
+  return (
+    <div className="viewbar">
+      <div className="segc" role="group" aria-label="Week layout">
+        {opts.map(([v, label]) => (
+          <button key={v} aria-pressed={value === v} onClick={() => onChange(v)}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

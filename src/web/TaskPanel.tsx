@@ -1,9 +1,10 @@
-import { useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { blockLength } from '../core/length';
 import type { CategoryView, DailyRow, DayView, StepView, TaskCard } from '../shared/api';
 import { catName, catStyle } from './cats';
 import { cap, clockMin, deadlineOn, dueLabel, fmtDur, fmtTime, momentOn, relWord } from './format';
 import type { BeginDrag } from './drag';
+import { drawerHeights, nearestStop, tapped, PEEK_PX, type DrawerStop } from './drawer';
 import { Check, Del, RepeatIcon } from './icons';
 
 /** What the user can do from the task panel. */
@@ -35,6 +36,8 @@ interface Props {
   actions: TaskActions;
   /** `over` is true while something that can come back to the list is dragged over the panel. */
   drag: { begin: BeginDrag; over: boolean };
+  /** At phone width the panel is a pull-up drawer (spec §5, "Phone"). */
+  drawer?: { stop: DrawerStop; onStop: (s: DrawerStop) => void };
 }
 
 const GROUPS = [
@@ -50,7 +53,7 @@ const GROUPS = [
 /** Group names by window, for messages like "Moved it to Soon." */
 export const WINDOW_LABEL: Record<string, string> = Object.fromEntries(GROUPS);
 
-export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions, drag }: Props) {
+export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions, drag, drawer }: Props) {
   const pass = (t: TaskCard) => filter === 'all' || t.categoryId === filter;
   const chips = [{ id: 'all', name: 'All' }, ...categories.filter((c) => c.id !== 'routine')];
   const card = (t: TaskCard) => (
@@ -59,7 +62,8 @@ export function TaskPanel({ day, categories, filter, showDone, openId, onFilter,
   const done = day.groups.done.filter(pass);
 
   return (
-    <aside className={`tasks${drag.over ? ' drop-on' : ''}`} aria-label="Tasks" data-drop="tasks">
+    <aside className={`tasks${drawer ? ' drawer' : ''}${drag.over ? ' drop-on' : ''}`} aria-label="Tasks" data-drop="tasks">
+      {drawer && <DrawerHandle day={day} {...drawer} />}
       <div className="tasks-inner">
         <div className="filters">
           {chips.map((c) => (
@@ -131,6 +135,89 @@ export function TaskPanel({ day, categories, filter, showDone, openId, onFilter,
         )}
       </div>
     </aside>
+  );
+}
+
+/** The panel's height for each drawer stop, measured from the screen and its header. */
+function heightsFor(panel: HTMLElement) {
+  const screen = panel.closest('.screen')!.getBoundingClientRect();
+  const top = panel.closest('.screen')!.querySelector('.top')!.getBoundingClientRect();
+  return drawerHeights(screen.height, top.bottom - screen.top);
+}
+
+/** Tap to open halfway or close. Drag to resize; it snaps to closed, half, or full. */
+function DrawerHandle({ day, stop, onStop }: { day: DayView; stop: DrawerStop; onStop: (s: DrawerStop) => void }) {
+  const open = (['overdue', 'near', 'week', 'soon', 'decide', 'ongoing'] as const).reduce((n, k) => n + day.groups[k].length, 0)
+    + day.groups.waiting.reduce((n, w) => n + w.tasks.length, 0);
+
+  // Sizes the panel for its stop, and again when the window changes size.
+  const ref = useRef<HTMLDivElement>(null);
+  const animate = useRef(false);
+  useLayoutEffect(() => {
+    const el = ref.current?.closest<HTMLElement>('.tasks');
+    if (!el) return;
+    const apply = (smooth: boolean) => {
+      el.style.transition = smooth ? 'height .28s ease' : 'none';
+      el.style.height = `${heightsFor(el)[stop]}px`;
+    };
+    apply(animate.current);
+    animate.current = true;
+    const resize = () => apply(false);
+    window.addEventListener('resize', resize);
+    return () => {
+      window.removeEventListener('resize', resize);
+      // Back to the wide panel's own height if the window widens.
+      el.style.transition = '';
+      el.style.height = '';
+    };
+  }, [stop]);
+
+  const down = (e: ReactPointerEvent) => {
+    const el = ref.current?.closest<HTMLElement>('.tasks');
+    if (!el || e.button !== 0) return;
+    e.preventDefault();
+    const hs = heightsFor(el);
+    const y0 = e.clientY;
+    const h0 = el.getBoundingClientRect().height;
+    let moved = false;
+    el.style.transition = 'none';
+    const move = (ev: PointerEvent) => {
+      const dy = y0 - ev.clientY;
+      if (Math.abs(dy) > 5) moved = true;
+      if (moved) el.style.height = `${Math.max(PEEK_PX, Math.min(hs.max, h0 + dy))}px`;
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      const next = moved ? nearestStop(el.getBoundingClientRect().height, hs) : tapped(stop);
+      el.style.transition = 'height .28s ease';
+      el.style.height = `${hs[next]}px`;
+      onStop(next);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="handle"
+      role="button"
+      tabIndex={0}
+      aria-expanded={stop !== 'peek'}
+      aria-label={stop === 'peek' ? 'Show tasks' : 'Hide tasks'}
+      onPointerDown={down}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        onStop(tapped(stop));
+      }}
+    >
+      <span className="grab" />
+      <span>{open} task{open === 1 ? '' : 's'}</span>
+    </div>
   );
 }
 

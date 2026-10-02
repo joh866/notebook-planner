@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BlockItem, ClassItem, MonthDay } from '../shared/api';
-import { agendaDayLabel, agendaLines } from './agenda';
+import { agendaDayLabel, agendaLines, monthDots } from './agenda';
 
 const event = (over: Partial<BlockItem>) => ({ id: 'e', kind: 'event', title: 'RSO fair', startMin: 900, tentative: false, categoryId: 'life', ...over }) as BlockItem;
 const skipped = { id: 'econ-disc@2026-10-02', code: 'ECON 20010', kind: 'Discussion', startMin: 810, categoryId: 'class' } as ClassItem;
@@ -34,5 +34,19 @@ describe('agendaDayLabel', () => {
     expect(agendaDayLabel('2026-10-02', '2026-10-02')).toBe('Today, Oct 2');
     expect(agendaDayLabel('2026-10-02', '2026-10-03')).toBe('Tomorrow, Oct 3');
     expect(agendaDayLabel('2026-10-02', '2026-10-04')).toBe('Sunday, Oct 4');
+  });
+});
+
+describe('monthDots', () => {
+  it('puts unfinished deadlines first in red, then events, up to four', () => {
+    const dots = monthDots(day({
+      deadlines: [
+        { taskId: 'a', name: 'a', dueAt: null, dueDate: '2026-10-02', atMin: null, done: false },
+        { taskId: 'c', name: 'c', dueAt: null, dueDate: '2026-10-02', atMin: null, done: true },
+      ],
+      events: [event({}), event({ id: 'e2' }), event({ id: 'e3' }), event({ id: 'e4' })],
+    }));
+    expect(dots.map((d) => [d.key, d.due])).toEqual([['due-a', true], ['e', false], ['e2', false], ['e3', false]]);
+    expect(dots[1]!.categoryId).toBe('life');
   });
 });

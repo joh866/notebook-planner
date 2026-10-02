@@ -92,11 +92,12 @@ function useFloating(anchor: HTMLElement, place: 'side' | 'below', onClose: () =
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('pointerdown', down, true);
     document.addEventListener('keydown', key);
-    window.addEventListener('scroll', onClose, { passive: true });
+    // Capture, so scrolling the phone's content area or the drawer counts too.
+    window.addEventListener('scroll', onClose, { passive: true, capture: true });
     return () => {
       document.removeEventListener('pointerdown', down, true);
       document.removeEventListener('keydown', key);
-      window.removeEventListener('scroll', onClose);
+      window.removeEventListener('scroll', onClose, { capture: true });
     };
   }, [onClose]);
 

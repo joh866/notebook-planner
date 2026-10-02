@@ -44,3 +44,11 @@ export function agendaDayLabel(today: string, date: string): string {
   const name = n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : d.toFormat('cccc');
   return `${name}, ${d.toFormat('LLL d')}`;
 }
+
+/** Up to four dots for a day in the phone month: red for unfinished deadlines, then events in their category colors (spec §8). */
+export function monthDots(day: MonthDay): { key: string; due: boolean; categoryId: string | null }[] {
+  return [
+    ...day.deadlines.filter((d) => !d.done).map((d) => ({ key: `due-${d.taskId}`, due: true, categoryId: null })),
+    ...day.events.map((e) => ({ key: e.id, due: false, categoryId: e.categoryId })),
+  ].slice(0, 4);
+}
