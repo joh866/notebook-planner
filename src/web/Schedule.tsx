@@ -16,7 +16,7 @@ import {
 import type { CategoryView, DayView, ScheduleItem, SettingsView } from '../shared/api';
 import { catStyle } from './cats';
 import { cap, clockMin, fmtRange, fmtTime, joinAnd, planLabel, planTarget, relWord, shortLoc } from './format';
-import { Check, PencilIcon, PinIcon, PlusIcon, RepeatIcon } from './icons';
+import { Check, Del, PencilIcon, PinIcon, PlusIcon, RepeatIcon } from './icons';
 
 /** One block on the day, ready to draw. */
 export interface Shown {
@@ -73,6 +73,14 @@ export function shown(item: ScheduleItem, today: string): Shown {
   };
 }
 
+/** What the × (and the matching popover action) does to a block (spec §7). */
+export function removeLabel(b: Shown): string {
+  const item = b.item;
+  if (item.type === 'class') return item.skipped ? 'Not skipping' : 'Skip this one';
+  if (item.type === 'routine') return 'Skip this day';
+  return item.kind === 'task' ? 'Back to the list' : 'Remove';
+}
+
 interface Props {
   day: DayView;
   settings: SettingsView;
@@ -84,10 +92,12 @@ interface Props {
   onCheck: (b: Shown) => void;
   onCheckTask: (taskId: string, done: boolean) => void;
   onDetails: (b: Shown, el: HTMLElement) => void;
+  onRemove: (b: Shown) => void;
+  onClearSometime: (taskId: string) => void;
   onPlan: () => void;
 }
 
-export function Schedule({ day, settings, categories, nowMin, opened, onOpen, onCheck, onCheckTask, onDetails, onPlan }: Props) {
+export function Schedule({ day, settings, categories, nowMin, opened, onOpen, onCheck, onCheckTask, onDetails, onRemove, onClearSometime, onPlan }: Props) {
   const blocks = useMemo(() => day.schedule.map((x) => shown(x, day.today)), [day]);
   const segs = segments({
     wakeMin: clockMin(settings.wakeTime),
@@ -122,6 +132,7 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
               <i className="dot"></i>
               <span>{s.title}</span>
               {s.rolledFrom && <em className="from">from {relWord(day.today, s.rolledFrom)}</em>}
+              <Del label={`Back to the list: ${s.title}`} onClick={() => onClearSometime(s.taskId)} />
             </div>
           ))}
         </div>
@@ -158,10 +169,10 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
           </div>
         ))}
         {open.map((b) => (
-          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} />
+          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} />
         ))}
         {rest.map((b, i) => (
-          <Block key={b.key} b={b} col={cols[i]!.col} cols={cols[i]!.cols} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} />
+          <Block key={b.key} b={b} col={cols[i]!.col} cols={cols[i]!.cols} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} />
         ))}
       </div>
     </section>
@@ -211,9 +222,10 @@ interface BlockProps {
   categories: CategoryView[];
   onCheck: (b: Shown) => void;
   onDetails: (b: Shown, el: HTMLElement) => void;
+  onRemove: (b: Shown) => void;
 }
 
-function Block({ b, col, cols, y, categories, onCheck, onDetails }: BlockProps) {
+function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove }: BlockProps) {
   const top = y(b.startMin);
   const height = Math.max(y(b.endMin) - top - 3, 20);
   const short = height < 37;
@@ -237,7 +249,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails }: BlockProps) 
       aria-label={`${b.title}, ${fmtRange(b.startMin, b.endMin)}. Details`}
       onClick={(e) => onDetails(b, e.currentTarget)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           onDetails(b, e.currentTarget);
         }
@@ -260,6 +272,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails }: BlockProps) 
         {b.recurring && <RepeatIcon />}
       </div>
       <div className="bm">{b.sub}</div>
+      <Del label={`${removeLabel(b)}: ${b.title}`} onClick={() => onRemove(b)} />
     </div>
   );
 }

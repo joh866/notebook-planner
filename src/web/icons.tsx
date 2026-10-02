@@ -50,3 +50,32 @@ export function Check({ checked, label, onToggle }: { checked: boolean; label: s
     />
   );
 }
+
+export const XIcon = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <path d="M4.2 4.4c2.5 2.4 5 4.9 7.6 7.3M11.8 4.2c-2.6 2.5-5.1 5-7.6 7.6" />
+  </svg>
+);
+
+export const TrashIcon = () => (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M2.8 4.3h10.4M6.2 4.2V2.8h3.6v1.4M4.1 4.4l.7 9.1h6.4l.7-9.1M6.6 6.8v4.4M9.4 6.8v4.4" />
+  </svg>
+);
+
+/** The small × or trash button that shows on hover (always faint on touch screens). */
+export function Del({ label, trash, className, onClick }: { label: string; trash?: boolean; className?: string; onClick: () => void }) {
+  return (
+    <button
+      className={`del${className ? ` ${className}` : ''}`}
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+    >
+      {trash ? <TrashIcon /> : <XIcon />}
+    </button>
+  );
+}

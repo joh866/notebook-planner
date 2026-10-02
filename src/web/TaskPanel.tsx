@@ -1,17 +1,36 @@
-import type { CategoryView, DailyRow, DayView, TaskCard } from '../shared/api';
+import { useState, type KeyboardEvent, type MouseEvent } from 'react';
+import type { CategoryView, DailyRow, DayView, StepView, TaskCard } from '../shared/api';
 import { catName, catStyle } from './cats';
 import { cap, clockMin, deadlineOn, dueLabel, fmtDur, fmtTime, momentOn, relWord } from './format';
-import { Check, RepeatIcon } from './icons';
+import { Check, Del, RepeatIcon } from './icons';
+
+/** What the user can do from the task panel. */
+export interface TaskActions {
+  checkTask: (id: string, done: boolean) => void;
+  checkRoutine: (row: DailyRow) => void;
+  deleteTask: (t: TaskCard) => void;
+  deleteRoutine: (row: DailyRow) => void;
+  decide: (t: TaskCard, yes: boolean) => void;
+  answer: (conditionId: string) => void;
+  notYet: (conditionId: string) => void;
+  pickCategory: (t: TaskCard, el: HTMLElement) => void;
+  checkStep: (step: StepView, done: boolean) => void;
+  addStep: (taskId: string, title: string) => void;
+  removeStep: (step: StepView) => void;
+  saveNotes: (taskId: string, notes: string | null) => void;
+}
 
 interface Props {
   day: DayView;
   categories: CategoryView[];
   filter: string;
   showDone: boolean;
+  /** The expanded card. */
+  openId: string | null;
   onFilter: (id: string) => void;
   onShowDone: (show: boolean) => void;
-  onCheckTask: (id: string, done: boolean) => void;
-  onCheckRoutine: (row: DailyRow) => void;
+  onToggleOpen: (id: string) => void;
+  actions: TaskActions;
 }
 
 const GROUPS = [
@@ -24,10 +43,15 @@ const GROUPS = [
   ['ongoing', 'Ongoing'],
 ] as const;
 
-export function TaskPanel({ day, categories, filter, showDone, onFilter, onShowDone, onCheckTask, onCheckRoutine }: Props) {
+/** Group names by window, for messages like "Moved it to Soon." */
+export const WINDOW_LABEL: Record<string, string> = Object.fromEntries(GROUPS);
+
+export function TaskPanel({ day, categories, filter, showDone, openId, onFilter, onShowDone, onToggleOpen, actions }: Props) {
   const pass = (t: TaskCard) => filter === 'all' || t.categoryId === filter;
   const chips = [{ id: 'all', name: 'All' }, ...categories.filter((c) => c.id !== 'routine')];
-  const card = (t: TaskCard) => <Card key={t.id} t={t} day={day} categories={categories} onCheck={onCheckTask} />;
+  const card = (t: TaskCard) => (
+    <Card key={t.id} t={t} day={day} categories={categories} open={openId === t.id} onToggle={() => onToggleOpen(t.id)} actions={actions} />
+  );
   const done = day.groups.done.filter(pass);
 
   return (
@@ -47,7 +71,7 @@ export function TaskPanel({ day, categories, filter, showDone, onFilter, onShowD
           ))}
         </div>
 
-        <Daily rows={day.daily} onCheck={onCheckRoutine} />
+        <Daily rows={day.daily} onCheck={actions.checkRoutine} onDelete={actions.deleteRoutine} />
 
         {GROUPS.map(([key, label]) => {
           if (key === 'waiting') {
@@ -62,7 +86,14 @@ export function TaskPanel({ day, categories, filter, showDone, onFilter, onShowD
                     {w.condition && (
                       <div className="cond">
                         <span className="cq">{w.condition.question}</span>
-                        {!w.ask && <span className="snz">Asking again tomorrow</span>}
+                        {w.ask ? (
+                          <>
+                            <button className="pill" onClick={() => actions.answer(w.condition!.id)}>Yes</button>
+                            <button className="pill" onClick={() => actions.notYet(w.condition!.id)}>Not yet</button>
+                          </>
+                        ) : (
+                          <span className="snz">Asking again tomorrow</span>
+                        )}
                       </div>
                     )}
                     {w.tasks.map(card)}
@@ -108,7 +139,7 @@ function GroupHead({ label, count, red }: { label: string; count: number; red?: 
   );
 }
 
-function Daily({ rows, onCheck }: { rows: DailyRow[]; onCheck: (row: DailyRow) => void }) {
+function Daily({ rows, onCheck, onDelete }: { rows: DailyRow[]; onCheck: (row: DailyRow) => void; onDelete: (row: DailyRow) => void }) {
   if (!rows.length) return null;
   return (
     <div>
@@ -130,7 +161,9 @@ function Daily({ rows, onCheck }: { rows: DailyRow[]; onCheck: (row: DailyRow) =
                 {fmtTime(clockMin(r.time))}
               </span>
             )}
+            {r.skipped && <span>Skipped today</span>}
           </span>
+          <Del trash label={`Delete routine: ${r.title}`} onClick={() => onDelete(r)} />
         </div>
       ))}
     </div>
@@ -160,19 +193,45 @@ function detailBits(t: TaskCard, day: DayView): { when: string | null; rest: str
   return { when, rest };
 }
 
-function Card({ t, day, categories, onCheck }: { t: TaskCard; day: DayView; categories: CategoryView[]; onCheck: (id: string, done: boolean) => void }) {
+/** Clicks on buttons and fields inside a card don't open or close it. */
+const fromControl = (e: MouseEvent | KeyboardEvent) => !!(e.target as HTMLElement).closest('button, input, textarea, a');
+
+interface CardProps {
+  t: TaskCard;
+  day: DayView;
+  categories: CategoryView[];
+  open: boolean;
+  onToggle: () => void;
+  actions: TaskActions;
+}
+
+function Card({ t, day, categories, open, onToggle, actions }: CardProps) {
   const decide = t.window === 'decide';
   const overdue = t.effectiveWindow === 'overdue';
-  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue'].filter(Boolean).join(' ');
+  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue', open && 'open'].filter(Boolean).join(' ');
   const due = deadlineOn(t, day.zone);
   const { when, rest } = detailBits(t, day);
+  const cat = catName(categories, t.categoryId);
 
   return (
-    <div className={cls} style={catStyle(categories, t.categoryId)}>
-      {decide ? <span className="q" aria-hidden="true">?</span> : <Check checked={!!t.doneAt} label={t.title} onToggle={() => onCheck(t.id, !t.doneAt)} />}
+    <div
+      className={cls}
+      style={catStyle(categories, t.categoryId)}
+      tabIndex={0}
+      aria-expanded={open}
+      aria-label={`${t.title}. ${open ? 'Hide' : 'Show'} steps and notes`}
+      onClick={(e) => !fromControl(e) && onToggle()}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+    >
+      {decide ? <span className="q" aria-hidden="true">?</span> : <Check checked={!!t.doneAt} label={t.title} onToggle={() => actions.checkTask(t.id, !t.doneAt)} />}
       <div>
         <div className="t">
-          <span className="catdot" title={catName(categories, t.categoryId)} aria-label={`Category: ${catName(categories, t.categoryId)}`} />
+          <button className="catdot" title={cat} aria-label={`Category: ${cat}. Change it`} onClick={(e) => actions.pickCategory(t, e.currentTarget)} />
           {t.title}
         </div>
         {t.meta && <div className="m">{t.meta}</div>}
@@ -184,11 +243,68 @@ function Card({ t, day, categories, onCheck }: { t: TaskCard; day: DayView; cate
           </div>
         )}
       </div>
-      {due && t.dueTone && (
-        <span className={`due ${t.doneAt ? '' : TONE[t.dueTone]}`}>
-          {overdue ? 'Was due' : 'Due'} {dueLabel(day.today, due.date, due.min)}
-        </span>
+      {decide ? (
+        <div className="decide">
+          <button onClick={() => actions.decide(t, true)}>Yes</button>
+          <button onClick={() => actions.decide(t, false)}>No</button>
+        </div>
+      ) : (
+        due && t.dueTone && (
+          <span className={`due ${t.doneAt ? '' : TONE[t.dueTone]}`}>
+            {overdue ? 'Was due' : 'Due'} {dueLabel(day.today, due.date, due.min)}
+          </span>
+        )
       )}
+      {open && <Details t={t} actions={actions} />}
+      <Del trash className="trash" label={`Delete task: ${t.title}`} onClick={() => actions.deleteTask(t)} />
+    </div>
+  );
+}
+
+/** The expanded card: a steps checklist and notes (spec §9). */
+function Details({ t, actions }: { t: TaskCard; actions: TaskActions }) {
+  const [step, setStep] = useState('');
+  const [notes, setNotes] = useState(t.notes ?? '');
+  const saveNotes = () => {
+    const v = notes.trim() ? notes : null;
+    if (v !== (t.notes ?? null)) actions.saveNotes(t.id, v);
+  };
+  return (
+    <div className="details">
+      <div className="lab">Steps</div>
+      <div className="steps">
+        {t.steps.map((s) => (
+          <div key={s.id} className={`step${s.done ? ' done' : ''}`}>
+            <Check checked={s.done} label={s.title} onToggle={() => actions.checkStep(s, !s.done)} />
+            <span>{s.title}</span>
+            <Del label={`Remove step: ${s.title}`} onClick={() => actions.removeStep(s)} />
+          </div>
+        ))}
+      </div>
+      <input
+        className="addstep"
+        value={step}
+        placeholder="Add a step and press Enter"
+        aria-label={`Add a step to ${t.title}`}
+        onChange={(e) => setStep(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          const v = step.trim();
+          if (!v) return;
+          actions.addStep(t.id, v);
+          setStep('');
+        }}
+      />
+      <div className="lab">Notes</div>
+      <textarea
+        className="notes"
+        value={notes}
+        placeholder="Links, materials, anything else"
+        aria-label={`Notes for ${t.title}`}
+        onChange={(e) => setNotes(e.target.value)}
+        onBlur={saveNotes}
+      />
     </div>
   );
 }

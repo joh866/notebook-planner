@@ -3,12 +3,15 @@ import { DateTime } from 'luxon';
 import { addDays } from '../core/day';
 import { lookForHour } from '../core/look';
 import { minutesOnDay } from '../core/time';
-import type { DailyRow } from '../shared/api';
-import { api, loadDay, type Loaded } from './client';
+import type { DailyRow, StepView, TaskCard } from '../shared/api';
+import { categoryName, catName, nextColor } from './cats';
+import { ClassDialog, classTitle } from './ClassDialog';
+import { api, loadDay, type Changed, type Loaded } from './client';
+import { joinAnd, relWord } from './format';
 import { Header, type View } from './Header';
-import { Popover, Toast, type ToastState } from './Overlays';
+import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
 import { Schedule, type Shown } from './Schedule';
-import { TaskPanel } from './TaskPanel';
+import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
 
 function useNow(): DateTime {
   const [now, setNow] = useState(() => DateTime.now());
@@ -32,6 +35,10 @@ export function App() {
   const [filter, setFilter] = useState('all');
   const [showDone, setShowDone] = useState(false);
   const [pop, setPop] = useState<{ b: Shown; el: HTMLElement } | null>(null);
+  const [catPick, setCatPick] = useState<{ t: TaskCard; el: HTMLElement } | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  /** The class dialog: a class id to edit, or 'new'. */
+  const [classEdit, setClassEdit] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const scrolled = useRef(false);
 
@@ -40,6 +47,8 @@ export function App() {
   }, []);
   const closeToast = useCallback(() => setToast(null), []);
   const closePop = useCallback(() => setPop(null), []);
+  const closeCatPick = useCallback(() => setCatPick(null), []);
+  const closeClassEdit = useCallback(() => setClassEdit(null), []);
 
   // Only the latest request is shown, so a slow older response can't replace a newer day.
   const latest = useRef(0);
@@ -117,6 +126,36 @@ export function App() {
     [reload, say],
   );
 
+  /** An Undo button for one or more tokens, undone newest first. */
+  const undoAction = (...tokens: (string | null)[]): ToastState['actions'] => {
+    const list = tokens.filter((x): x is string => !!x).reverse();
+    if (!list.length) return [];
+    return [{ label: 'Undo', run: () => void act(async () => { for (const tk of list) await api.undo(tk); }) }];
+  };
+
+  /** Runs a change, reloads, then says what happened with Undo (spec §10, "Undo"). */
+  const change = async <T,>(
+    run: () => Promise<Changed<T>>,
+    message: string | null | ((item: T) => string | null),
+    extra: (r: Changed<T>) => ToastState['actions'] = () => [],
+  ): Promise<Changed<T> | null> => {
+    let r: Changed<T>;
+    try {
+      r = await run();
+    } catch (e) {
+      say(e instanceof Error ? e.message : 'That didn’t work.');
+      await reload();
+      return null;
+    }
+    await reload();
+    const msg = typeof message === 'function' ? message(r.item) : message;
+    if (msg) {
+      const more = extra(r) ?? [];
+      say(msg, [...more, ...(undoAction(r.undo) ?? [])], more.length ? 7000 : undefined);
+    }
+    return r;
+  };
+
   const checkTask = (id: string, done: boolean) => act(() => api.setTaskDone(id, done));
   const checkRoutine = (r: DailyRow) => act(() => api.setRoutineChecked(r.routineId, data!.day.date, !r.checked));
   const checkBlock = (b: Shown) => {
@@ -124,6 +163,83 @@ export function App() {
     if (item.type === 'routine') return act(() => api.setRoutineChecked(item.routineId, data!.day.date, !item.checked));
     if (item.type === 'block' && item.taskId) return checkTask(item.taskId, !item.done);
     if (item.type === 'block') return act(() => api.setBlockDone(item.id, !item.done));
+  };
+
+  /** The × on a block, and the matching popover action (spec §7). */
+  const removeBlock = (b: Shown) => {
+    const item = b.item;
+    const date = data!.day.date;
+    if (item.type === 'class') {
+      return change(
+        () => api.setClassSkipped(item.classId, item.homeDate, !item.skipped),
+        item.skipped ? 'Not skipping it after all.' : `Skipping ${b.title} ${relWord(data!.day.today, date)}.`,
+      );
+    }
+    if (item.type === 'routine') {
+      return change(() => api.skipSlot(item.slotId, date), `Skipped ${b.title} for this day.`, (r) => [{
+        label: 'Every day instead',
+        run: () => void (async () => {
+          if (r.undo) await api.undo(r.undo).catch(() => {});
+          await change(() => api.deleteSlot(item.slotId), 'Off the schedule on every day. It’s still in your checklist.');
+        })(),
+      }]);
+    }
+    return change(() => api.deleteBlock(item.id), item.kind === 'task' ? 'Back on your list.' : `Removed “${b.title}”.`);
+  };
+
+  const pinBlock = (b: Shown) => {
+    const item = b.item;
+    if (item.type !== 'block') return;
+    return change(
+      () => api.setBlockPinned(item.id, !item.pinned),
+      item.pinned ? 'Unpinned. The planner may move it when you plan again.' : 'Pinned here. The planner won’t move it.',
+    );
+  };
+
+  const classOnScreen = (classId: string) => {
+    const c = data?.day.schedule.find((x) => x.type === 'class' && x.classId === classId);
+    return c?.type === 'class' ? classTitle(c) : 'the class';
+  };
+
+  const actions: TaskActions = {
+    checkTask,
+    checkRoutine,
+    deleteTask: (t) => {
+      if (openId === t.id) setOpenId(null);
+      void change(() => api.deleteTask(t.id), `Deleted “${t.title}”.`);
+    },
+    deleteRoutine: (r: DailyRow) => void change(() => api.deleteRoutine(r.routineId), `Deleted “${r.title}”.`),
+    decide: (t, yes) => void change(() => api.decide(t.id, yes), (res) => {
+      if (res.made) return `Moved “${res.made.title}” to ${WINDOW_LABEL[res.made.window] ?? res.made.window}.`;
+      if (res.skipped) return `Skipping ${classOnScreen(res.skipped.classId)} ${relWord(data!.day.today, res.skipped.date)}. It’s marked on the schedule.`;
+      return yes ? 'Noted.' : 'Dropped it.';
+    }),
+    answer: (id) => void change(() => api.answerCondition(id), (res) =>
+      res.moved.length ? `Moved ${joinAnd(res.moved.map((x) => `“${x.title}”`))} to Soon.` : 'Noted.'),
+    notYet: (id) => void change(() => api.snoozeCondition(id, addDays(data!.day.today, 1)), 'Asking again tomorrow.'),
+    pickCategory: (t, el) => {
+      setPop(null);
+      setCatPick({ t, el });
+    },
+    checkStep: (st: StepView, done) => void change(() => api.setStepDone(st.id, done), null),
+    addStep: (taskId, title) => void change(() => api.addStep(taskId, title), null),
+    removeStep: (st) => void change(() => api.deleteStep(st.id), `Removed the step “${st.title}”.`),
+    saveNotes: (taskId, notes) => void change(() => api.patchTask(taskId, { notes }), null),
+  };
+
+  const pickCategory = (t: TaskCard, id: string) =>
+    void change(() => api.patchTask(t.id, { categoryId: id }), `Moved “${t.title}” to ${catName(data!.categories, id)}.`);
+  const newCategory = async (t: TaskCard, raw: string) => {
+    const name = categoryName(raw);
+    try {
+      const made = await api.addCategory(name, nextColor(data!.categories));
+      const moved = await api.patchTask(t.id, { categoryId: made.item.id });
+      await reload();
+      say(`Made a new category, “${name}”.`, undoAction(made.undo, moved.undo));
+    } catch (e) {
+      say(e instanceof Error ? e.message : 'That didn’t work.');
+      await reload();
+    }
   };
 
   if (!data) {
@@ -176,6 +292,8 @@ export function App() {
               onCheck={checkBlock}
               onCheckTask={checkTask}
               onDetails={(b, el) => setPop({ b, el })}
+              onRemove={(b) => void removeBlock(b)}
+              onClearSometime={(taskId) => void change(() => api.clearSometime(taskId), 'Back on your list.')}
               onPlan={() => say('The planner isn’t built yet. It comes in a later step.')}
             />
           ) : (
@@ -190,14 +308,48 @@ export function App() {
             categories={categories}
             filter={filter}
             showDone={showDone}
+            openId={openId}
             onFilter={setFilter}
             onShowDone={setShowDone}
-            onCheckTask={checkTask}
-            onCheckRoutine={checkRoutine}
+            onToggleOpen={(id) => setOpenId((o) => (o === id ? null : id))}
+            actions={actions}
           />
         )}
       </div>
-      {pop && <Popover b={pop.b} anchor={pop.el} day={day} onCheck={checkBlock} onClose={closePop} />}
+      {pop && (
+        <Popover
+          b={pop.b}
+          anchor={pop.el}
+          day={day}
+          onCheck={checkBlock}
+          onRemove={(b) => void removeBlock(b)}
+          onPin={(b) => void pinBlock(b)}
+          onEditClass={setClassEdit}
+          onClose={closePop}
+        />
+      )}
+      {catPick && (
+        <CatPicker
+          anchor={catPick.el}
+          current={catPick.t.categoryId}
+          categories={categories}
+          onPick={(id) => pickCategory(catPick.t, id)}
+          onNew={(name) => void newCategory(catPick.t, name)}
+          onClose={closeCatPick}
+        />
+      )}
+      {classEdit && (
+        <ClassDialog
+          classId={classEdit === 'new' ? null : classEdit}
+          zone={day.zone}
+          weekStart={settings.weekStart}
+          onClose={closeClassEdit}
+          onDone={(message, token) => {
+            setClassEdit(null);
+            void reload().then(() => say(message, undoAction(token)));
+          }}
+        />
+      )}
       <Toast key={toast?.id} toast={toast} onClose={closeToast} />
     </div>
   );

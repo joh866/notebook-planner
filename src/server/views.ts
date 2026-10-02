@@ -173,13 +173,11 @@ function dailyRows(ctx: Ctx, date: string): DailyRow[] {
     .filter((r) => routineOccursOn(r, date))
     .map((r) => {
       const checked = new Set(ctx.data.routineChecks.filter((c) => c.routineId === r.id).map((c) => c.date));
-      const slot = ctx.data.routineSlots
-        .filter((s) => s.routineId === r.id)
-        .map((s) => slotOn(r, s, date, ctx.data.slotExceptions))
-        .find((o) => o);
+      const slots = ctx.data.routineSlots.filter((s) => s.routineId === r.id);
+      const slot = slots.map((s) => slotOn(r, s, date, ctx.data.slotExceptions)).find((o) => o);
       return {
         routineId: r.id, title: r.title, categoryId: r.categoryId, durationMinutes: r.durationMinutes,
-        checked: checked.has(date), streak: r.showStreak ? streak(r, checked, date) : null,
+        checked: checked.has(date), skipped: slots.length > 0 && !slot, streak: r.showStreak ? streak(r, checked, date) : null,
         time: slot?.start ?? null, steps: routineStepsOn(ctx, r.id, date),
       };
     });

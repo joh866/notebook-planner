@@ -415,3 +415,69 @@ describe('categories, check-ins, and settings', () => {
     expect((await get<DayView>('/api/day?tz=America/Los_Angeles')).zone).toBe('America/New_York');
   });
 });
+
+describe('decisions and check-ins', () => {
+  type Decided = { item: { made: { id: string; title: string; window: string } | null; skipped: { classId: string; date: string } | null }; undo: string };
+
+  it('Yes turns a decision into a task in its category, and Undo brings the decision back', async () => {
+    const res = await call<Decided>('POST', '/api/tasks/blanket/decide', { yes: true });
+    expect(res.status).toBe(200);
+    expect(res.body.item.made).toMatchObject({ title: 'Get a new blanket', window: 'soon' });
+    expect((await call('GET', '/api/tasks/blanket')).status).toBe(404);
+    const day = await get<DayView>('/api/day');
+    expect(day.groups.soon.find((t) => t.id === res.body.item.made!.id)).toMatchObject({ categoryId: 'errand' });
+    expect(ids(day.groups.decide)).not.toContain('blanket');
+
+    await undo(res.body.undo);
+    const after = await get<DayView>('/api/day');
+    expect(ids(after.groups.decide)).toContain('blanket');
+    expect(after.groups.soon.find((t) => t.title === 'Get a new blanket')).toBeUndefined();
+  });
+
+  it('Yes on "Skip econ discussion Friday?" skips that class, and Undo un-skips it', async () => {
+    const res = await call<Decided>('POST', '/api/tasks/skip-disc/decide', { yes: true });
+    expect(res.body.item.skipped).toEqual({ classId: 'econ-disc', date: '2026-10-02' });
+    const disc = (d: DayView) => ofType(d, 'class').find((c) => c.classId === 'econ-disc')!;
+    expect(disc(await get<DayView>('/api/day')).skipped).toBe(true);
+    await undo(res.body.undo);
+    const after = await get<DayView>('/api/day');
+    expect(disc(after).skipped).toBe(false);
+    expect(ids(after.groups.decide)).toContain('skip-disc');
+  });
+
+  it('No drops the decision without doing anything else', async () => {
+    const res = await call<Decided>('POST', '/api/tasks/skip-disc/decide', { yes: false });
+    expect(res.body.item).toEqual({ made: null, skipped: null });
+    const day = await get<DayView>('/api/day');
+    expect(ids(day.groups.decide)).not.toContain('skip-disc');
+    expect(ofType(day, 'class').find((c) => c.classId === 'econ-disc')!.skipped).toBe(false);
+  });
+
+  it('only answers decisions', async () => {
+    expect((await call('POST', '/api/tasks/quant/decide', { yes: true })).status).toBe(409);
+    expect((await call('POST', '/api/tasks/nope/decide', { yes: true })).status).toBe(404);
+    expect((await call('POST', '/api/tasks/blanket/decide', {})).status).toBe(400);
+  });
+
+  it('Yes on a check-in moves every task under it to Soon, and Undo puts them back', async () => {
+    const res = await call<{ item: { moved: { id: string }[] }; undo: string }>('POST', '/api/conditions/cold/answer');
+    expect(ids(res.body.item.moved)).toEqual(['gym', 'boxing']);
+    const day = await get<DayView>('/api/day');
+    expect(ids(day.groups.soon)).toEqual(expect.arrayContaining(['gym', 'boxing']));
+    expect(day.groups.waiting.find((w) => w.condition?.id === 'cold')).toBeUndefined();
+    expect((await get<{ answeredAt: string }>('/api/conditions/cold')).answeredAt).toBe('2026-10-02T20:00:00Z');
+
+    await undo(res.body.undo);
+    const after = await get<DayView>('/api/day');
+    expect(after.groups.waiting.find((w) => w.condition?.id === 'cold')).toMatchObject({ ask: true });
+    expect(ids(after.groups.soon)).not.toContain('gym');
+    expect((await call('POST', '/api/conditions/nope/answer')).status).toBe(404);
+  });
+
+  it('marks a routine skipped in the checklist when its time is skipped for the day', async () => {
+    await call('PUT', '/api/slot-exceptions/morning-slot/2026-10-02', { skipped: true });
+    const day = await get<DayView>('/api/day');
+    expect(day.daily.find((r) => r.routineId === 'morning')).toMatchObject({ skipped: true, time: null });
+    expect(day.daily.find((r) => r.routineId === 'meditate')).toMatchObject({ skipped: false });
+  });
+});

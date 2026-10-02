@@ -190,6 +190,9 @@ const ConditionFields = z.strictObject({
 export const ConditionInputSchema = ConditionFields;
 export const ConditionPatchSchema = ConditionFields.partial();
 
+/** Yes or No on a decision item (spec §10). */
+export const DecideInputSchema = z.strictObject({ yes: z.boolean() });
+
 export const SettingsPatchSchema = z.strictObject({
   wakeTime: ClockSchema,
   bedTime: ClockSchema,
@@ -208,6 +211,19 @@ export const SettingsPatchSchema = z.strictObject({
 export interface Changed<T = undefined> {
   item: T;
   undo: string | null;
+}
+
+/** POST /api/tasks/:id/decide. The decision is dropped either way. */
+export interface DecisionResult {
+  /** The task Yes made, if any. */
+  made: { id: string; title: string; window: Window } | null;
+  /** The class Yes skipped, keyed by its Chicago day. */
+  skipped: { classId: string; date: string } | null;
+}
+
+/** POST /api/conditions/:id/answer. The tasks that moved to Soon. */
+export interface ConditionAnswer {
+  moved: { id: string; title: string }[];
 }
 
 export interface StepView {
@@ -357,6 +373,8 @@ export interface DailyRow {
   categoryId: string | null;
   durationMinutes: number;
   checked: boolean;
+  /** Its time on the schedule is skipped for this day. */
+  skipped: boolean;
   /** Only for routines that show one. */
   streak: number | null;
   /** Local "HH:mm" when it's on the schedule that day. */

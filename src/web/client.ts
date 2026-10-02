@@ -1,4 +1,4 @@
-import type { CategoryView, DayView, SettingsView } from '../shared/api';
+import type { CategoryView, ConditionAnswer, DayView, DecisionResult, SettingsView } from '../shared/api';
 
 // Talks to the server. The web app never works out the plan itself; it shows what comes back.
 
@@ -35,16 +35,60 @@ export async function loadDay(date: string | null): Promise<Loaded> {
   return { day, settings, categories: [...categories].sort((a, b) => a.sortOrder - b.sortOrder) };
 }
 
-interface Changed {
+export interface Changed<T = unknown> {
+  item: T;
   undo: string | null;
 }
 
+/** A weekly class as stored (GET /api/classes/:id). Times are "HH:mm" in its own zone. */
+export interface ClassRow {
+  id: string;
+  code: string;
+  kind: string;
+  fullName: string | null;
+  days: number[];
+  start: string;
+  end: string;
+  timeZone: string;
+  location: string | null;
+  categoryId: string | null;
+}
+export type ClassInput = Omit<ClassRow, 'id' | 'timeZone' | 'categoryId'>;
+
 export const api = {
-  rollover: () => send<Changed & { item: { moved: string[] } }>('POST', `/api/rollover?${tz()}`),
+  rollover: () => send<Changed<{ moved: string[] }>>('POST', `/api/rollover?${tz()}`),
   undo: (token: string) => send<{ ok: true }>('POST', `/api/undo/${token}`),
+
   setTaskDone: (id: string, done: boolean) =>
     send<Changed>('PATCH', `/api/tasks/${id}`, { doneAt: done ? new Date().toISOString() : null }),
+  patchTask: (id: string, body: { notes?: string | null; categoryId?: string | null }) => send<Changed>('PATCH', `/api/tasks/${id}`, body),
+  deleteTask: (id: string) => send<Changed>('DELETE', `/api/tasks/${id}`),
+  decide: (id: string, yes: boolean) => send<Changed<DecisionResult>>('POST', `/api/tasks/${id}/decide`, { yes }),
+
+  addStep: (taskId: string, title: string) => send<Changed>('POST', `/api/tasks/${taskId}/steps`, { title }),
+  setStepDone: (id: string, done: boolean) => send<Changed>('PATCH', `/api/task-steps/${id}`, { done }),
+  deleteStep: (id: string) => send<Changed>('DELETE', `/api/task-steps/${id}`),
+
+  addCategory: (name: string, color: string) => send<Changed<CategoryView>>('POST', '/api/categories', { name, color }),
+
+  answerCondition: (id: string) => send<Changed<ConditionAnswer>>('POST', `/api/conditions/${id}/answer`),
+  snoozeCondition: (id: string, until: string) => send<Changed>('PATCH', `/api/conditions/${id}`, { snoozedUntil: until }),
+
   setBlockDone: (id: string, done: boolean) => send<Changed>('PATCH', `/api/blocks/${id}`, { done }),
+  setBlockPinned: (id: string, pinned: boolean) => send<Changed>('PATCH', `/api/blocks/${id}`, { pinned }),
+  deleteBlock: (id: string) => send<Changed>('DELETE', `/api/blocks/${id}`),
+  clearSometime: (taskId: string) => send<Changed>('DELETE', `/api/sometime/${taskId}`),
+
   setRoutineChecked: (routineId: string, date: string, checked: boolean) =>
     send<Changed>(checked ? 'PUT' : 'DELETE', `/api/routine-checks/${routineId}/${date}`),
+  skipSlot: (slotId: string, date: string) => send<Changed>('PUT', `/api/slot-exceptions/${slotId}/${date}`, { skipped: true }),
+  deleteSlot: (slotId: string) => send<Changed>('DELETE', `/api/routine-slots/${slotId}`),
+  deleteRoutine: (id: string) => send<Changed>('DELETE', `/api/routines/${id}`),
+
+  setClassSkipped: (classId: string, homeDate: string, skipped: boolean) =>
+    send<Changed>(skipped ? 'PUT' : 'DELETE', `/api/class-skips/${classId}/${homeDate}`),
+  getClass: (id: string) => send<ClassRow>('GET', `/api/classes/${id}`),
+  addClass: (body: ClassInput) => send<Changed<ClassRow>>('POST', '/api/classes', { ...body, categoryId: 'class' }),
+  patchClass: (id: string, body: ClassInput) => send<Changed<ClassRow>>('PATCH', `/api/classes/${id}`, body),
+  deleteClass: (id: string) => send<Changed>('DELETE', `/api/classes/${id}`),
 };
