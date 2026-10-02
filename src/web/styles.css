@@ -1,0 +1,56 @@
+/* Variables, fonts, and header styles come from design/prototype-6.html. */
+:root {
+  --hand:'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --body:'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+body[data-mode="day"] {
+  --bg:#EEECE4; --dots:#C9C3B2; --ink:#253047; --muted:#6B7180; --line:#D6D0C0;
+  --panel:#F7F5EF; --card:#FCFBF8; --card-border:#D3CDBC; --frame:rgba(37,48,71,.55);
+  --accent:#2F4F9E; --red:#C2413B; --hl:rgba(224,177,42,.45);
+  --chip:rgba(37,48,71,.07); --hover:rgba(37,48,71,.07); --past:rgba(37,48,71,.045); --off:rgba(37,48,71,.035);
+  --surround:#D8D5CB; --scrim:rgba(30,36,51,.16); --hl-green:rgba(63,154,115,.32); --amber:#A8670F;
+  --c-class:#3D63C9; --c-errand:#E0B12A; --c-growth:#3F9A73; --c-life:#D46B95; --c-routine:#8A79C6; --fill:30%;
+}
+body[data-mode="night"] {
+  --bg:#1B2130; --dots:#2D3545; --ink:#E4DFD1; --muted:#979DAB; --line:#323A4C;
+  --panel:#20273A; --card:#252D41; --card-border:#3A4359; --frame:rgba(228,223,209,.42);
+  --accent:#93B1F2; --red:#EF7F73; --hl:rgba(232,193,78,.32);
+  --chip:rgba(228,223,209,.08); --hover:rgba(228,223,209,.08); --past:rgba(0,0,0,.16); --off:rgba(0,0,0,.14);
+  --surround:#10141D; --scrim:rgba(0,0,0,.35); --hl-green:rgba(108,199,158,.28); --amber:#E8B464;
+  --c-class:#7E9CF0; --c-errand:#E8C14E; --c-growth:#6CC79E; --c-life:#EE93B6; --c-routine:#ADA0EC; --fill:26%;
+}
+body { --c-none:#8A8F99; --dotbg:radial-gradient(var(--dots) 1.1px, transparent 1.4px); }
+
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  min-height:100vh; color:var(--ink); font-family:var(--body); font-size:15px; line-height:1.45;
+  background-color:var(--bg); background-image:var(--dotbg); background-size:20px 20px;
+  -webkit-font-smoothing:antialiased; transition:background-color .3s, color .3s;
+}
+button, input, textarea { font:inherit; color:inherit; }
+button { cursor:pointer; }
+[hidden] { display:none !important; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.box { border:1.5px solid var(--frame); background:var(--panel); border-radius:5px 7px 6px 4px; color:var(--ink); }
+button.box:hover { background:var(--hover); }
+
+/* ---------- Layout ---------- */
+.device { max-width:1720px; margin:0 auto; padding:22px 28px 60px; }
+
+/* ---------- Header ---------- */
+.headrow { display:flex; align-items:center; justify-content:space-between; gap:10px 16px; flex-wrap:wrap; }
+.daterow { display:flex; align-items:baseline; gap:12px; min-width:0; }
+.daterow h1 { font-family:var(--hand); font-size:46px; font-weight:700; line-height:1; white-space:nowrap; }
+.clock { font-family:var(--hand); font-size:28px; color:var(--muted); white-space:nowrap; }
+.rule { height:2px; background:var(--ink); opacity:.5; margin:10px 0 8px; border-radius:2px; }
+.phone-only { display:none; }
+
+/* ---------- Phone ---------- */
+@media (max-width:700px) {
+  .device { padding:14px 14px 4px; }
+  .daterow { width:100%; justify-content:space-between; }
+  .daterow h1 { font-size:31px; }
+  .clock { font-size:22px; }
+  .wide-only { display:none; }
+  .phone-only { display:inline; }
+}
