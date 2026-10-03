@@ -356,6 +356,26 @@ export type AddedItem =
   | { kind: 'routine'; id: string; title: string }
   | { kind: 'class'; id: string; title: string };
 
+/** A change the add box made to something that already existed (spec §11). */
+export type ChangeDone =
+  | { action: 'done' | 'delete' | 'update' | 'move' | 'checkStep'; kind: 'task' | 'routine' | 'event' | 'step'; id: string; title: string; detail: string | null }
+  /** Time reported for a task, with what it moved and trimmed. */
+  | { action: 'log'; kind: 'task'; id: string; title: string; detail: null; log: LogResult };
+
+/** When it's unclear which item is meant, nothing changes and the message asks (spec §11). */
+export interface AddQuestion {
+  prompt: string;
+  options: { id: string; title: string }[];
+  /** The change to make with the chosen id: POST /api/changes. */
+  change: Record<string, unknown>;
+}
+
+/** A check-in question the text seems to answer: the message offers Yes (spec §11). */
+export interface CheckInOffer {
+  conditionId: string;
+  question: string;
+}
+
 /** POST /api/add. */
 export interface AddResult {
   added: AddedItem[];
@@ -364,6 +384,19 @@ export interface AddResult {
   fellBack: number;
   /** Why the first failed chunk failed. */
   reason: string | null;
+  changes: ChangeDone[];
+  questions: AddQuestion[];
+  offers: CheckInOffer[];
+  /** Words for items it couldn't find. */
+  missing: string[];
+}
+
+/** POST /api/changes: one change, with the id picked from a question's buttons. */
+export const ChangeInputSchema = z.strictObject({ change: z.record(z.string(), z.unknown()), id: z.string().min(1).max(200) });
+export interface ChangesResult {
+  changes: ChangeDone[];
+  questions: AddQuestion[];
+  missing: string[];
 }
 
 export interface StepView {

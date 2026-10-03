@@ -2,6 +2,7 @@ import type {
   AddResult,
   AgendaView,
   CategoryView,
+  ChangesResult,
   ConditionAnswer,
   LogResult,
   SessionView,
@@ -125,6 +126,8 @@ export const api = {
   addSession: (taskId: string, startAt: string, minutes: number) => send<Changed<SessionView>>('POST', `/api/tasks/${taskId}/sessions`, { startAt, minutes }),
   patchSession: (id: string, body: { startAt?: string; endAt?: string }) => send<Changed<SessionView>>('PATCH', `/api/task-sessions/${id}`, body),
   deleteSession: (id: string) => send<Changed>('DELETE', `/api/task-sessions/${id}`),
+  /** A question's button after the add box: make the change with the chosen item (spec §11). */
+  applyChange: (change: Record<string, unknown>, id: string) => send<Changed<ChangesResult>>('POST', `/api/changes?${tz()}`, { change, id }),
   /** "Still on?" on a timed "if" task or event (spec §7). */
   stillOn: (kind: 'tasks' | 'blocks', id: string, yes: boolean) => send<Changed<StillOnResult>>('POST', `/api/${kind}/${id}/still-on`, { yes }),
   snoozeCondition: (id: string, until: string) => send<Changed>('PATCH', `/api/conditions/${id}`, { snoozedUntil: until }),

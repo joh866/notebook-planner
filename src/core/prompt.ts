@@ -14,7 +14,22 @@ export interface PromptContext {
   classes: { code: string; kind: string; days: number[]; start: string; end: string }[];
   /** Custom category names (built-ins are always listed). */
   customCategories: string[];
+  /**
+   * What already exists, as short lines with ids, so the text can change it (spec §11): tasks,
+   * routines, today's and tomorrow's schedule, open check-ins, and recent actual times.
+   */
+  existing?: {
+    tasks: string[];
+    routines: string[];
+    schedule: string[];
+    checkIns: string[];
+    recent: string[];
+    averages: string[];
+    edited: string[];
+  };
 }
+
+const section = (title: string, lines: string[] | undefined) => (lines?.length ? `\n${title}:\n${lines.map((l) => `  ${l}`).join('\n')}` : '');
 
 export function systemPrompt(ctx: PromptContext): string {
   const next = Array.from({ length: 14 }, (_, i) => {
@@ -35,11 +50,17 @@ export function systemPrompt(ctx: PromptContext): string {
     ? `\n- Since it's after midnight, "today" means ${cal}, the day that just started: "2:30pm today" is ${cal} at 14:30. Late-night times up to 4am, like "1am", still mean tonight: date ${ctx.today} with that time.`
     : '';
 
+  const e = ctx.existing;
+  const existing = e
+    ? `${section('Their tasks (ids in brackets)', e.tasks)}${section('Their routines', e.routines)}${section('Today and tomorrow on the schedule', e.schedule)}${section('Open check-in questions', e.checkIns)}${section('Recent actual times (estimate, then how long it took)', e.recent)}${section('Average by category', e.averages)}${section('Estimates they set themselves', e.edited)}`
+    : '';
+
   return `You turn quick notes into planner items for a college student. ${now}
 Next 14 days: ${next.join(', ')}.
-Their weekly classes: ${classes}.
+Their weekly classes: ${classes}.${existing}
 
-Reply with ONLY a JSON object, no prose and no code fences: {"items":[...]}
+Reply with ONLY a JSON object, no prose and no code fences: {"items":[...],"changes":[...],"answers":[...]}
+"items" are new things. "changes" change things that already exist. "answers" lists ids of open check-in questions the text implies are answered Yes. Leave out an empty list.
 Each item has "type": "task", "routine", "event", or "class". Leave out any field that doesn't apply. Keep it compact.
 Fields:
 - title: short. Tasks start with a verb ("Get razor"). Keep names and course codes as written.
@@ -62,6 +83,17 @@ Fields:
 - kind (classes): "Lecture", "Discussion", "Seminar", "Lab", and so on.
 - loc: the location, if given.
 - tentative: true when a time is approximate ("around 7?", "depends on friends").
+- minutes (events): the length, when there's no end ("for 90 minutes").
+- asap (events): true for "asap": it starts at the earliest free time, right after its "after" item if it has one. Leave out start.
+- flexible (events): true for a soft time like "preferably before 1:30pm".
+Each change has "action": "done", "delete", "update", "move", "checkStep", or "log", and "id": the existing item's id from the lists above. Never invent an id.
+- done: finished. "sosc reading done" is done for the SOSC reading task.
+- log: time spent, with "start" ("HH:MM", today unless "date" is given) and "minutes" (or "end"), and "done": true if it was finished. "sosc reading done (82 minutes starting at 3:46pm)" is {"action":"log","id":"...","start":"15:46","minutes":82,"done":true}. "Did 40 minutes of the reading" is log with "minutes":40 and "done":false.
+- delete: remove it. "Delete the blanket thing."
+- update: new values in the same fields as items: title, meta, notes, due (null clears it), est, win, cat, short, loc. "Math pset is due thursday now."
+- move: a new "date" and/or "start". "Move laundry to Sunday."
+- checkStep: a step done, with "step": the step's id. "Finished chapter 2."
+- When it's unclear which item is meant, give "options": the ids it could be, and leave out "id". If nothing fits, give "match": the words they used.
 Rules:
 - Never invent a date, time, or deadline that wasn't given. Put vague timing in win instead.
 - Classes are never deadlines, and a class meeting is never a task. Work due "before the next ECON lecture" is due at that class's start, and its short name says what the work is ("ECON notes review", not "ECON lecture").
@@ -74,5 +106,9 @@ Rules:
 - These are notes the student wrote to themselves, often messy. Remarks in parentheses, like "(no specific due date)", "(contingent)", "(daily thing)", "(near near future)", or "(judgment needed)", describe the item: use them to set fields, and leave them out of the title.
 - "Near near future" means today or tomorrow. "Near future" means about a week.
 - A header line (like "Category: Homework", or a date such as "10/6 (Tuesday)" followed by a course code or "(before 2:00pm)") applies to the lines under it, for example as their due date, due time, and course. It is not an item itself.
-- A plan for today written as times ("Right now: 5:30pm", "Dinner: around 7?", "Sleep by 12") becomes events for today; mark approximate ones tentative.`;
+- A plan for today written as times ("Right now: 5:30pm", "Dinner: around 7?", "Sleep by 12") becomes events for today; mark approximate ones tentative.
+- A plan for the day in a sentence becomes events for today, in order. "Around 4" is a tentative 16:00. "Preferably before 1:30pm" means start by then: a tentative 13:15 with flexible true and meta "Preferably before 1:30pm". "After X" sets after to X; with no time it starts right when X ends. "Asap" is asap true. "For 90 minutes" is minutes 90. "If it's open" or "stop by if" is an "if" with an ask. Unknown lengths are about 60 minutes for events and about 30 for quick stops.
+- Example: "go to mtg event at crerar library preferably before 1:30pm, head to go club after asap and stop by if its open, meet with friends at around 4 to go to gym for 90 minutes" is the MTG event at Crerar Library at a tentative 13:15 (60 minutes); "Stop by Go club" after the MTG event, asap, 30 minutes, if it's open; and "Gym with friends" at a tentative 16:00 for 90 minutes. Going to the gym implies "Is the cold fully gone?" is answered, so its id goes in answers.
+- Something they already did that's in the lists is a change, not a new item.
+- Estimates: use their recent actual times and averages when they fit. Small chores get lean estimates, like 10-15 minutes to organize a drawer, not 20-45. Messages and tiny chores are quick.`;
 }

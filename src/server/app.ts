@@ -12,6 +12,7 @@ import { anthropicSorter, type SortChunk } from './ai';
 import { registerAnswers } from './answers';
 import { registerDrops } from './drops';
 import { autoPencil, registerPlan } from './plan';
+import { registerChanges } from './changes';
 import { registerSessions } from './sessions';
 import { notFound, readBody, registerResources, type Run } from './resources';
 import { Change, UndoStore, applyUndo, findRows, whereKey } from './undo';
@@ -96,6 +97,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   registerAdds(app, db, run, now, sort);
   registerPlan(app, db, run, now);
   registerSessions(app, db, run, now);
+  registerChanges(app, db, run, now);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {

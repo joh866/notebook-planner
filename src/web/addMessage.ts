@@ -1,5 +1,6 @@
-import type { AddResult } from '../shared/api';
+import type { AddResult, ChangeDone } from '../shared/api';
 import { fmtTime, joinAnd, momentOn, relWord } from './format';
+import { logMessage } from './logMessage';
 
 // The add box's result message (spec §11, "After adding"): exactly what happened, and whether the
 // AI sorted it.
@@ -20,7 +21,13 @@ function sortedBy(r: AddResult): string {
  */
 export function addMessage(r: AddResult, today: string, zone: string, labels: Record<string, string>): string {
   const n = r.added.length;
-  if (!n) return `Couldn’t find anything to add in that.${r.fellBack && r.reason ? ` (The AI wasn’t available: ${r.reason}.)` : ''}`;
+  const others = [
+    ...r.changes.map((c) => changeText(c, today, zone)),
+    ...(r.missing.length ? [`Couldn’t find ${joinAnd(r.missing.map((m) => `“${m}”`))}.`] : []),
+    ...r.questions.map((q) => `${q.prompt} Nothing changed yet.`),
+  ];
+  if (!n && !others.length) return `Couldn’t find anything to add in that.${r.fellBack && r.reason ? ` (The AI wasn’t available: ${r.reason}.)` : ''}`;
+  if (!n) return `${others.join(' ')} ${sortedBy(r)}`;
 
   let what: string;
   if (n === 1) {
@@ -52,5 +59,23 @@ export function addMessage(r: AddResult, today: string, zone: string, labels: Re
     const penciled = r.added.filter((a) => a.kind === 'task' && a.penciled).length;
     what = `Added ${n} items: ${joinAnd(parts)}.${penciled ? ` Penciled in ${penciled}.` : ''}`;
   }
-  return `${what} ${sortedBy(r)}`;
+  return `${[what, ...others].join(' ')} ${sortedBy(r)}`;
+}
+
+/** One change to something that already existed (spec §11, "After adding"). */
+export function changeText(c: ChangeDone, today: string, zone: string): string {
+  switch (c.action) {
+    case 'log':
+      return logMessage(c.log, today, zone);
+    case 'done':
+      return `Marked “${c.title}” done.`;
+    case 'delete':
+      return `Deleted “${c.title}”.`;
+    case 'update':
+      return `Updated “${c.title}”${c.detail ? `: ${c.detail}` : ''}.`;
+    case 'move':
+      return `Moved “${c.title}”${c.detail ? ` to ${c.detail}` : ''}.`;
+    case 'checkStep':
+      return `Checked off “${c.title}”${c.detail ? ` in “${c.detail}”` : ''}.`;
+  }
 }

@@ -3,8 +3,15 @@ import Anthropic from '@anthropic-ai/sdk';
 // The AI side of the add box (spec §11). The key is read here on the server only and never leaves
 // it: not in responses, not in logs.
 
-/** Sorts one chunk of notes. Resolves to the raw items from the reply, or throws with a short reason. */
-export type SortChunk = (system: string, chunk: string) => Promise<unknown[]>;
+/** A whole reply: new items, changes to existing ones, and check-ins the text answers (spec §11). */
+export interface SortReply {
+  items: unknown[];
+  changes: unknown[];
+  answers: unknown[];
+}
+
+/** Sorts one chunk of notes. Resolves to the reply (or just its items), or throws with a short reason. */
+export type SortChunk = (system: string, chunk: string) => Promise<unknown[] | SortReply>;
 
 /** Used when `.env` doesn't name a model. */
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
@@ -12,8 +19,13 @@ export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 /** A failure the result message can show as its reason. */
 export class SortError extends Error {}
 
-/** The JSON object in a reply, even if it came wrapped in prose or code fences. */
+/** The items in a reply, even if it came wrapped in prose or code fences. */
 export function readReply(text: string): unknown[] {
+  return readSortReply(text, true).items;
+}
+
+/** The JSON object in a reply. It needs an items list, or (unless `needItems`) a changes list. */
+export function readSortReply(text: string, needItems = false): SortReply {
   const clean = text.replace(/```(?:json)?/g, '').trim();
   const start = clean.indexOf('{');
   const end = clean.lastIndexOf('}');
@@ -24,9 +36,9 @@ export function readReply(text: string): unknown[] {
   } catch {
     throw new SortError('the AI’s reply wasn’t valid JSON');
   }
-  const items = (obj as { items?: unknown }).items;
-  if (!Array.isArray(items)) throw new SortError('the AI’s reply had no items list');
-  return items;
+  const { items, changes, answers } = obj as { items?: unknown; changes?: unknown; answers?: unknown };
+  if (!Array.isArray(items) && (needItems || !Array.isArray(changes))) throw new SortError('the AI’s reply had no items list');
+  return { items: Array.isArray(items) ? items : [], changes: Array.isArray(changes) ? changes : [], answers: Array.isArray(answers) ? answers : [] };
 }
 
 /** A short, safe reason for a failed call. API error messages never include the key. */
@@ -68,7 +80,7 @@ export function anthropicSorter(env: NodeJS.ProcessEnv = process.env): SortChunk
       if (res.stop_reason === 'refusal') throw new SortError('the AI declined to sort this');
       if (res.stop_reason === 'max_tokens') throw new SortError('the AI’s reply was cut off');
       const text = res.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
-      return readReply(text);
+      return readSortReply(text);
     } catch (err) {
       const reason = reasonFor(err);
       console.warn(`AI sorting failed for a chunk: ${reason}`);

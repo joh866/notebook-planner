@@ -4,7 +4,7 @@ import { addDays } from '../core/day';
 import { lookForHour } from '../core/look';
 import { minutesOnDay } from '../core/time';
 import type { AddResult, DailyRow, DropInput, RoutineStepView, StepView, TaskCard } from '../shared/api';
-import { addMessage } from './addMessage';
+import { addMessage, changeText } from './addMessage';
 import { categoryName, catName, nextColor } from './cats';
 import { ClassDialog, classTitle } from './ClassDialog';
 import { api, loadAll, type Changed, type Loaded } from './client';
@@ -439,7 +439,16 @@ export function App() {
     }
     await reload();
     const { today, zone } = data!.day;
-    say(addMessage(r.item, today, zone, WINDOW_LABEL), undoAction(r.undo), 9000);
+    // A button for each item an unclear change could mean, and Yes for any check-in the text answers (spec §11).
+    const choices = r.item.questions.flatMap((q) => q.options.map((o) => ({
+      label: o.title,
+      run: () => void change(() => api.applyChange(q.change, o.id), (res) => res.changes.map((x) => changeText(x, today, zone)).join(' ') || 'Done.'),
+    })));
+    const offers = r.item.offers.map((o) => ({
+      label: `${o.question} Yes`,
+      run: () => actions.answer(o.conditionId),
+    }));
+    say(addMessage(r.item, today, zone, WINDOW_LABEL), [...choices, ...offers, ...(undoAction(r.undo) ?? [])], choices.length || offers.length ? 15000 : 9000);
     const cards = r.item.added.filter((a) => a.kind === 'task' || a.kind === 'sometime').map((a) => a.id);
     if (!cards.length) return true;
     setFilter('all');

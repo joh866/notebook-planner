@@ -1,0 +1,14 @@
+{
+  "_about": "Recorded AI replies for tests/fixtures/notes-oct-9.txt, one per line, in the reply shape spec §11 asks for. Tests map these without calling the API.",
+  "sosc reading done (82 minutes starting at 3:46pm)": {
+    "changes": [{ "action": "log", "id": "muqaddimah", "start": "15:46", "minutes": 82, "done": true }]
+  },
+  "go to mtg event at crear library preferably before 1:30pm, head to go club after asap and stop by if its open, meet with friends at around 4 to go to gym for 90 minutes": {
+    "items": [
+      { "type": "event", "title": "MTG event", "date": "2026-10-03", "start": "13:15", "minutes": 60, "tentative": true, "flexible": true, "loc": "Crerar Library", "meta": "Preferably before 1:30pm", "cat": "life" },
+      { "type": "event", "title": "Stop by Go club", "date": "2026-10-03", "after": "MTG event", "asap": true, "minutes": 30, "if": "if it's open", "ask": "Is the Go club open?", "cat": "life" },
+      { "type": "event", "title": "Gym with friends", "date": "2026-10-03", "start": "16:00", "minutes": 90, "tentative": true, "cat": "life" }
+    ],
+    "answers": ["cold"]
+  }
+}

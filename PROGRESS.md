@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13e.
+Step 13f.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -102,7 +102,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - Logged blocks at the time they actually happened, and trimming a past event they overlap.
   - The time log, opened from Done and from Settings, with the estimate next to the actual time. Entries can be edited.
   - Edited estimates are remembered.
-- [ ] **13e. The add box makes changes and plans days** (spec §11).
+- [x] **13e. The add box makes changes and plans days** (spec §11).
   - **What the AI gets:** current tasks, routines, today's and tomorrow's schedule, and recent actual times.
   - **Change actions:** done, delete, update, move, check a step, and log time. When it's unclear which item is meant, ask with buttons and change nothing.
   - **Day plans:** soft times ("around," "preferably before," "asap") and order ("after"), with conditions.
@@ -208,4 +208,23 @@ Agents add short notes here when a step is done.
     - `TimeLog.tsx` is a sheet opened from "Time log" under Done and from Settings. Each entry shows the estimate next to the actual time (or the rough answer). Sessions can be edited (start, with the 12-hour picker, and minutes), deleted, or added.
     - Choices: partial progress records a session but doesn't move or add a block, and the card says "40m done so far". The rough "How long did it take?" answer stays as it was.
   - No existing tests changed. New: `core/sessions.test.ts`, `server/sessions.test.ts` (the spec's 3:46pm example with the RSO fair trimmed, then Undo), `web/logMessage.test.ts`, and a logged block in `labels.test`.
+- Step 13e:
+  - **What the AI gets.** `server/addContext.ts` builds short lines with ids, in 12-hour times, under new headings in the prompt:
+    - unfinished tasks (window, category id, due, estimate, notes, conditions, and steps with ids),
+    - routines (repeat, time, steps),
+    - today's and tomorrow's blocks and routine times,
+    - open check-ins,
+    - the last 40 finished tasks with an actual time or a rough answer, the average by category, and estimates the user set themselves.
+  - **The reply** is now `{ items, changes, answers }`. `readSortReply` reads it, and `readReply` still returns just the items. A sorter may still return a bare items list. `readChanges` and `readAnswers` are in `shared/parsed.ts`.
+  - **Changes** (`server/changes.ts`):
+    - Actions: done, delete, update, move, checkStep, and log (`logTime` from 13d, which moves the block and trims events).
+    - Finding the item: by id (a task block's id means its task, and checkStep can name a task plus a step), by the AI's `options`, or by `match` words. All the words must appear; "reading" matches "read", and numbers must match exactly.
+    - One match is applied. Several give a question with a button for each and change nothing; the button calls `POST /api/changes { change, id }`. None goes in `missing`.
+    - Reported times are today, or yesterday if that time hasn't come yet. With no start, they end now.
+    - Choices: moving a weekly routine to a day changes its weekday ("Laundry now every Sunday"). Moving it with a time changes that day only. Moving a task to a day puts it in that day's Sometime lane; with a time, its next block moves or a new one is made.
+    - Everything from one entry, items and changes, is one Undo.
+  - **Day plans.** Events can have `minutes` (length), `asap`, and `flexible`. An event with "after" or "asap" and no time is placed once everything is added: right when its prerequisite ends, or else the earliest free time from now. A soft time is a tentative start with the note in its label ("Around 1:15pm, preferably before 1:30pm").
+  - **Offers.** `answers` become `offers` (open questions only), shown as "Is the cold fully gone? Yes" buttons on the toast. `addMessage` now lists changes (via `changeText`, and `logMessage` for time), what it couldn't find, and the questions. With only items, the message is the same as before.
+  - Tests: `tests/fixtures/notes-oct-9.txt` holds the user's two exact lines, and `notes-oct-9.replies.json` the recorded replies. `server/addChanges.test.ts` covers both lines (the 3:46pm log with the RSO fair trimmed and one Undo; the MTG event at 1:15pm, the Go club right after it if it's open, the gym 4–5:30pm, and the cold offer), what the prompt contains, every change action, matching by words, partial progress, questions, and missing items. No existing test's expected results changed (the `addMessage.test` fixture gained the new empty lists).
+  - **Not done yet:** the user's one check with the real API, using these two lines.
 

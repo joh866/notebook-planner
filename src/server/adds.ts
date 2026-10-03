@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Hono } from 'hono';
 import { DateTime } from 'luxon';
@@ -9,19 +9,22 @@ import { addDays, dayOf, weekday } from '../core/day';
 import { localParse } from '../core/localParse';
 import { systemPrompt } from '../core/prompt';
 import { atMinute, clockOnDay, parseClock, resolveZone } from '../core/time';
+import { firstFit, shapeOf } from '../core/planner';
 import { effectiveWindow } from '../core/urgency';
 import { twelveHour } from '../core/words';
 import { AddInputSchema, ZoneSchema, type AddResult, type AddedItem } from '../shared/api';
 import { categoryName, findCategory, nextColor } from '../shared/categories';
-import { readItems, type ParsedItem } from '../shared/parsed';
+import { readAnswers, readChanges, readItems, type ParsedChange, type ParsedItem } from '../shared/parsed';
 import type { Window } from '../shared/schemas';
 import type { SortChunk } from './ai';
 import type { Db } from './db/client';
 import * as t from './db/schema';
 import { readBody, type Run } from './resources';
 import { findRows, tableOf, whereKey, type Change, type TableName, type Tx } from './undo';
+import { promptExisting } from './addContext';
+import { applyChanges } from './changes';
 import { autoPencil } from './plan';
-import { getSettings } from './views';
+import { getSettings, planInputs } from './views';
 
 // The add box (spec §11). The text is split into chunks that the AI sorts in parallel; a chunk that
 // fails gets the local guess instead. Everything found is added right away, as one change with one
@@ -259,14 +262,25 @@ class Adder {
     return true;
   }
 
-  /** An event with a time goes on the schedule. Without one, it's a task in that day's Sometime lane. */
+  /** Events in a plan for the day with no time yet ("after X", "asap"): they get one once everything is added. */
+  private deferred: { id: string; date: string; minutes: number }[] = [];
+
+  /**
+   * An event with a time goes on the schedule. One that comes "after" something or "asap" gets its
+   * time once everything is added. Without either, it's a task in that day's Sometime lane.
+   */
   private addEvent(p: ParsedItem) {
     let date = isDay(p.date) ? p.date : this.ctx.calToday;
-    if (!p.start) return this.addTask(p, { window: 'near', sometime: date === this.ctx.today ? this.ctx.calToday : date });
-    date = this.landing(date, p.start, this.ctx.zone, true);
-    const start = dayMinute(p.start);
-    let end = p.end ? dayMinute(p.end) : start + 60;
-    if (end <= start) end = start + 60;
+    if (date === this.ctx.today) date = this.ctx.calToday;
+    const deferred = !p.start && (!!p.after || !!p.asap);
+    if (!p.start && !deferred) return this.addTask(p, { window: 'near', sometime: date });
+    // A deferred event starts now for the moment; placeDeferred moves it.
+    const clock = p.start ?? this.ctx.now.setZone(this.ctx.zone).toFormat('HH:mm');
+    if (p.start) date = this.landing(date, p.start, this.ctx.zone, true);
+    else date = dayOf(this.ctx.now, this.ctx.zone);
+    const start = dayMinute(clock);
+    let end = p.end ? dayMinute(p.end) : start + (p.minutes ?? 60);
+    if (end <= start) end = start + (p.minutes ?? 60);
     const startAt = iso(atMinute(date, start, this.ctx.zone));
     const row: Row = {
       id: randomUUID(), kind: 'event', title: p.title, categoryId: this.category(p.cat, null),
@@ -276,6 +290,37 @@ class Adder {
     this.addConditions(p, 'blocks', row);
     this.insert('blocks', [row]);
     this.added.push({ kind: 'event', id: row.id as string, title: p.title, date, startAt });
+    if (deferred) this.deferred.push({ id: row.id as string, date, minutes: end - start });
+  }
+
+  /**
+   * Gives "after" and "asap" events their times (spec §11, "A plan for the day"): right when what
+   * they come after ends, or else the earliest free time from now. Never in the past.
+   */
+  placeDeferred(free: (date: string, skip: Set<string>) => { from: number; to: number; busy: [number, number][] }) {
+    const utc = (x: string) => DateTime.fromISO(x, { zone: 'utc' });
+    for (const d of this.deferred) {
+      const row = this.tx.select().from(t.blocks).where(eq(t.blocks.id, d.id)).get()!;
+      let start: DateTime | null = null;
+      const pre = row.afterBlockId
+        ? this.tx.select().from(t.blocks).where(eq(t.blocks.id, row.afterBlockId)).all()
+        : row.afterTaskId ? this.tx.select().from(t.blocks).where(eq(t.blocks.taskId, row.afterTaskId)).all() : [];
+      const ends = pre.map((b) => utc(b.startAt).plus({ minutes: b.durationMinutes })).sort((a, b) => a.toMillis() - b.toMillis()).at(-1);
+      if (ends && ends > this.ctx.now) start = ends;
+      if (!start) {
+        const day = free(d.date, new Set([d.id]));
+        const at = firstFit(day.from, day.to, shapeOf(d.minutes, []), day.busy);
+        start = at == null ? this.ctx.now : atMinute(d.date, at, this.ctx.zone);
+      }
+      const startAt = iso(start);
+      this.change.before('blocks', [row]);
+      this.tx.update(t.blocks).set({ startAt }).where(eq(t.blocks.id, d.id)).run();
+      const a = this.added.find((x) => x.id === d.id);
+      if (a?.kind === 'event') {
+        a.startAt = startAt;
+        a.date = dayOf(start, this.ctx.zone);
+      }
+    }
   }
 }
 
@@ -295,14 +340,23 @@ export function registerAdds(app: Hono, db: Db, run: Run, now: () => DateTime, s
       time: at.setZone(zone).toFormat('HH:mm'),
       classes: db.select().from(t.classes).all(),
       customCategories: db.select().from(t.categories).all().filter((x) => !x.builtin).map((x) => x.name),
+      existing: promptExisting(db, at, zone, settings.homeTimeZone, today),
     });
     const chunks = chunkText(text);
     const settled = await Promise.allSettled(chunks.map((chunk) => sort(system, chunk)));
 
     let fellBack = 0;
     let reason: string | null = null;
+    const changes: ParsedChange[] = [];
+    const answers = new Set<string>();
     const items = settled.flatMap((r, i) => {
-      if (r.status === 'fulfilled') return readItems(r.value);
+      if (r.status === 'fulfilled') {
+        // A reply is the whole object, or (from older callers) just the items.
+        const reply = Array.isArray(r.value) ? { items: r.value, changes: [], answers: [] } : r.value;
+        changes.push(...readChanges(reply.changes));
+        for (const a of readAnswers(reply.answers)) answers.add(a);
+        return readItems(reply.items);
+      }
       fellBack++;
       reason ??= r.reason instanceof Error ? r.reason.message : String(r.reason);
       return localParse(chunks[i]!, calToday);
@@ -313,11 +367,18 @@ export function registerAdds(app: Hono, db: Db, run: Run, now: () => DateTime, s
       const adder = new Adder(tx, change, { now: at, zone, homeZone: settings.homeTimeZone, today, calToday, tags });
       for (const item of items) adder.add(item);
       adder.linkAfters();
+      adder.placeDeferred((date, skip) => planInputs(db, at, device).day(date, skip));
+      // Changes to what already exists (spec §11), in the same Undo.
+      const done = applyChanges(tx, change, { now: at, zone, homeZone: settings.homeTimeZone, today, calToday }, changes);
       // With automatic scheduling on, new tasks that are due soon get penciled in (spec §12).
       const tasks = adder.added.filter((a) => a.kind === 'task');
       const penciled = autoPencil(db, tx, change, at, device, tasks.map((a) => a.id));
       for (const a of tasks) a.penciled = penciled.get(a.id) ?? null;
-      return { added: adder.added, chunks: chunks.length, fellBack, reason };
+      // Check-ins the text seems to answer: the message offers Yes (spec §11).
+      const offers = tx.select().from(t.conditions).all()
+        .filter((q) => answers.has(q.id) && !q.answeredAt)
+        .map((q) => ({ conditionId: q.id, question: q.question }));
+      return { added: adder.added, chunks: chunks.length, fellBack, reason, ...done, offers };
     }));
   });
 }

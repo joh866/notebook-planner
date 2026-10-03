@@ -4,7 +4,7 @@ import { addMessage } from './addMessage';
 
 const LABELS = { overdue: 'Overdue', near: 'Today or tomorrow', week: 'This week', soon: 'Soon', waiting: 'Waiting on something', decide: 'Needs a decision', ongoing: 'Ongoing' };
 const CHI = 'America/Chicago';
-const result = (added: AddedItem[], more: Partial<AddResult> = {}): AddResult => ({ added, chunks: 1, fellBack: 0, reason: null, ...more });
+const result = (added: AddedItem[], more: Partial<AddResult> = {}): AddResult => ({ added, chunks: 1, fellBack: 0, reason: null, changes: [], questions: [], offers: [], missing: [], ...more });
 const msg = (r: AddResult) => addMessage(r, '2026-10-02', CHI, LABELS);
 
 describe('addMessage', () => {
