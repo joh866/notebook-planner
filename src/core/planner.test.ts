@@ -265,3 +265,49 @@ describe('Quick things (spec §10)', () => {
     ]);
   });
 });
+
+describe('a prerequisite inherits the urgency of what waits on it (spec §12)', () => {
+  // Tuesday, October 6: Read The Muqaddimah is due at 2pm, and it needs Get The Muqaddimah first.
+  // The morning is full: a class 10–11:30, and five other tasks for today or tomorrow.
+  const TUE = '2026-10-06';
+  const tue = () => day(TUE, 9 * 60, 23 * 60, [[10 * 60, 11 * 60 + 30]]);
+  const get = task('get-book', { title: 'Get The Muqaddimah', window: 'week', estLow: 20, estHigh: 40 });
+  const read = task('muqaddimah', { title: 'Read The Muqaddimah', window: 'week', dueAt: chicago('2026-10-06T14:00'), estLow: 180, estHigh: 300,
+    sittingMinutes: 75, after: { taskId: 'get-book', ends: null } });
+  const prep = task('response', { title: 'Prep for the reading response', window: 'week', dueAt: chicago('2026-10-06T14:00'), estLow: 45, estHigh: 60,
+    after: { taskId: 'muqaddimah', ends: null } });
+  const others = ['a', 'b', 'c', 'd', 'e'].map((id) => task(id, { window: 'near', estLow: 60, estHigh: 60 }));
+
+  it('on a full day, Get The Muqaddimah and the reading both fit before Tuesday at 2pm, Get first', () => {
+    const placed = planDay(tue(), [...others, read, get], clock);
+    const g = placed.find((p) => p.taskId === 'get-book');
+    const r = placed.find((p) => p.taskId === 'muqaddimah');
+    expect(g).toBeDefined();
+    expect(r).toBeDefined();
+    expect(placed.indexOf(g!)).toBeLessThan(placed.indexOf(r!));
+    expect(r!.startMin).toBeGreaterThanOrEqual(g!.startMin + g!.minutes);
+    // The reading ends at least 15 minutes before its 2pm deadline.
+    expect(r!.startMin + r!.minutes).toBeLessThanOrEqual(14 * 60 - 15);
+    expect(g!.reason).toBe('Needed for Read The Muqaddimah, due Tue 2pm');
+  });
+
+  it('passes urgency down a chain: Prep waits on Read, which waits on Get', () => {
+    // Here only Prep has a deadline, so Read and Get get their urgency from it.
+    const openRead = { ...read, dueAt: null, sittingMinutes: 45 };
+    const roomy = day(TUE, 9 * 60, 23 * 60);
+    const placed = planDay(roomy, [...others, prep, openRead, get], clock);
+    expect(placed.slice(0, 3).map((p) => [p.taskId, p.reason])).toEqual([
+      ['get-book', 'Needed for Prep for the reading response, due Tue 2pm'],
+      ['muqaddimah', 'Needed for Prep for the reading response, due Tue 2pm'],
+      ['response', 'Due Tue 2pm'],
+    ]);
+    expect(placed[2]!.startMin + placed[2]!.minutes).toBeLessThanOrEqual(14 * 60 - 15);
+  });
+
+  it('keeps a prerequisite’s own score when it’s already higher', () => {
+    const urgentGet = { ...get, dueAt: chicago('2026-10-06T10:00'), estLow: 20, estHigh: 20 };
+    const laterRead = { ...read, dueAt: chicago('2026-10-09T14:00') };
+    const [first] = planDay(tue(), [urgentGet, laterRead], clock);
+    expect(first).toMatchObject({ taskId: 'get-book', reason: 'Due Tue 10am' });
+  });
+});

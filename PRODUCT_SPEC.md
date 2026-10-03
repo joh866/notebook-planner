@@ -547,7 +547,7 @@ Free time is from your wake time (or now, plus 10 minutes, if planning today) un
 | Has a deadline | plus 90 ÷ (days left + 1), plus 4 per hour of the high estimate |
 | Committed to this day (Sometime lane, or rolled over) | plus 200 |
 
-Decision items are never planned, and neither are "if" items whose question is unanswered. "After" items are placed only after their prerequisite. Nothing is placed before now. Quick tasks are batched into "Quick things" blocks. A task due on the target day must end at least 15 minutes before its deadline.
+Decision items are never planned, and neither are "if" items whose question is unanswered. "After" items are placed only after their prerequisite. A prerequisite scores at least as high as anything waiting on it, down a whole chain, so it's planned first and what waits on it still fits before its deadline. Its reason says so: "Needed for Read The Muqaddimah, due Tue 2pm". Nothing is placed before now. Quick tasks are batched into "Quick things" blocks. A task due on the target day must end at least 15 minutes before its deadline.
 
 ### Block length
 
@@ -703,6 +703,7 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 9, 2026:** v0.7. A prerequisite inherits the deadline urgency of whatever waits on it (§12).
 - **Oct 9, 2026:** v0.7. Themes come in day and night pairs: Notebook, Sleek, Glass, Mono, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk, with exact values from the theme samples. Settings picks a day theme and a night theme separately, and a day theme pre-fills its partner. Six palettes come from Candela (MIT), so its license notice is in the repo.
 - **Oct 9, 2026:** v0.6. Themes: Notebook and Sleek. Conditions use look C.
 - **Oct 9, 2026:** v0.5. Notes from using the app (step 13).

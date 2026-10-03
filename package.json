@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm test",
+    "check": "npm run typecheck && npm run lint && npm test && npm run db:check",
     "seed": "tsx src/server/db/seed-cli.ts",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:check": "tsx src/server/db/check-cli.ts",
+    "db:repair": "tsx src/server/db/repair-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

@@ -1,3 +1,4 @@
+import { inArray } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { BlockItem, DayView, PlanResult } from '../shared/api';
@@ -21,6 +22,9 @@ beforeEach(() => {
   seed(db);
   clock = NOW;
   app = createApp({ db, now: () => clock, sort: () => Promise.reject(new Error('no AI in tests')) });
+  // These tests are about batching. The SOSC reading chain is finished, so its inherited urgency
+  // (step 13h) doesn't take the Plan button's six places.
+  db.update(t.tasks).set({ doneAt: '2026-10-02T23:00:00Z' }).where(inArray(t.tasks.id, ['get-book', 'muqaddimah', 'response'])).run();
 });
 
 async function call<T = unknown>(method: string, path: string, body?: unknown) {

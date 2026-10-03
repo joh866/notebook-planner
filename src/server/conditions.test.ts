@@ -127,7 +127,8 @@ describe('the add box', () => {
 
 describe('the Plan button', () => {
   it('never plans an unanswered "if" task, and plans it once answered', async () => {
-    await call('PATCH', '/api/tasks/gym', { window: 'near' });
+    // Due that day, so it ranks among the six the Plan button places.
+    await call('PATCH', '/api/tasks/gym', { window: 'near', dueDate: '2026-10-04' });
     const before = await call<{ item: { placed: { taskId: string }[] } }>('POST', `/api/plan?tz=${CHI}`, { date: '2026-10-04' });
     expect(before.body.item.placed.map((p) => p.taskId)).not.toContain('gym');
     await call('POST', `/api/undo/${(before.body as unknown as { undo: string }).undo}`);

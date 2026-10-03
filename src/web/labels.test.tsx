@@ -34,7 +34,7 @@ async function load() {
   await send('POST', '/api/blocks', { kind: 'task', taskId: 'math-pset', startAt: '2026-10-05T21:15:00Z', durationMinutes: 75, pinned: false, reason: 'Due Wed 11am' });
   await send('POST', '/api/tasks', { title: 'Hand in the form', window: 'near', dueAt: '2026-10-05T18:30:00Z' });
   // A "Quick things" block from the planner.
-  await send('POST', '/api/tasks', { title: 'Text Sam back', window: 'near', estLow: 5, estHigh: 5, quick: true });
+  await send('POST', '/api/tasks', { title: 'Text Sam back', window: 'near', estLow: 5, estHigh: 5, quick: true, dueDate: DAY });
   await send('POST', `/api/plan?tz=${CHI}`, { date: DAY });
   // A logged block: the reading, done 1:05–1:20pm.
   await send('POST', `/api/tasks/response/log?tz=${CHI}`, { startAt: '2026-10-05T18:05:00Z', minutes: 15, done: true });

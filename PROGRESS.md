@@ -122,6 +122,9 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - Themes come in day and night pairs, with the exact values in `design/theme-samples.html` (Notebook, Sleek) and `design/theme-samples-3.html` (the rest): Notebook day and night, Sleek light and dark, Glass light and dark, Mono and Mono night, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk.
   - Settings, under Look, gets a Day theme and a Night theme, chosen separately. Picking a day theme pre-fills its partner. Automatic switching at 8am and 8pm stays.
   - Six palettes come from Candela (MIT license), so include its license notice in the repo.
+- [x] **13h. Database check and prerequisite urgency** (before going online).
+  - **The live database matches the migrations.** Back up `data/planner.db` to `data/backups/` first. Then fix the delete rule `blocks.session_id` is missing (step 13d's migration was applied before its hand fix), and the stored hash of that migration. Add `npm run db:check`, which compares the live database with what the migrations make, since step 14 copies this database to the server.
+  - **A prerequisite inherits the urgency of what waits on it** (spec §12). Test: on a full day, Get The Muqaddimah and Read The Muqaddimah both fit before Tuesday at 2pm, with Get first.
 
 ## Part 2: online
 
@@ -141,7 +144,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
 
 ## Backlog
 Ideas and annoyances from using the app. Add them here. Don't fix them in the middle of another step.
-- The planner could give a prerequisite the urgency of what waits on it. Today Get The Muqaddimah scores as a plain This week task, so on a full day Read The Muqaddimah (due Tuesday) may not fit after it until the next day's plan.
+- Re-planning a day forgets that a task was picked for it: placing a task takes it out of the Sometime lane, so when Plan lifts its penciled block again, it no longer gets "You picked this day for it" (+200). Found in step 13h.
 - Temporary: `vite.config.ts` sets `server.host: '0.0.0.0'` so the phone can open the dev server on the same Wi-Fi (Mac's IP, port 5173). There's no sign-in, so anyone on that network can read and edit the planner. Remove it in step 14, once the app is online with a sign-in.
 
 ## Notes
@@ -253,4 +256,16 @@ Agents add short notes here when a step is done.
   - **License.** `THIRD_PARTY_NOTICES.md` has Candela's MIT notice ("Copyright (c) 2026 Candela Themes", from its LICENSE on GitHub).
   - Checked in the browser by switching `data-theme` only, so the saved settings weren't touched: Notebook looks as before, and Sleek light, Glass dark, Mono, Sepia Paper, and Harbor Dusk (at 390px) all render.
   - Tests: `shared/themes.test.ts` (pairs point at each other), `web/themes.test.ts` (every theme has its own block with all colors, and nothing extra), and `server/themes.test.ts` (defaults, saving, an unknown theme refused). No existing tests changed.
+- Step 13h:
+  - **The live database.** `src/server/db/schemaCheck.ts`. `compareSchema` builds a fresh in-memory database from the migrations. It compares every table, index, trigger, and view definition in `sqlite_master` with the live one, character for character, plus the migration record (each file's hash and journal time). `repairSchema` fixes only what's safe:
+    - A table whose columns are the same but whose constraints differ gets its stored definition rewritten in place. That's SQLite's documented way to change a constraint without touching rows: `writable_schema` plus a `schema_version` bump, with better-sqlite3's defensive mode lifted just for that.
+    - Stored migration hashes are corrected.
+    - It finishes with `integrity_check` and `foreign_key_check`. Anything else (missing or different columns, extra tables) is reported and left alone.
+  - **Commands.** `npm run db:check` only reads the database, exits 1 on any difference, and skips when there's no file. It's now part of `npm run check`, so step 14 can't copy a database that doesn't match. `npm run db:repair` backs up first with SQLite's backup API to `data/backups/planner-<time>.db`, confirms the backup passes the integrity check with the same task count, and only then repairs.
+  - **What was fixed.** Run on the real database: backed up to `data/backups/planner-2026-10-03T120430.db`, then fixed table `blocks` (`session_id` now `ON UPDATE no action ON DELETE set null`) and migration #7's hash (`20d3462…` → `078a39b…`, the file's hash after the hand fix). Row counts were the same before and after (30 tasks, 11 blocks, 5 routines). The integrity check is `ok`, there are no foreign key problems, `db:check` passes, and the running API kept serving. The 13d workaround (clearing the link before deleting a session) stays, as a harmless extra.
+  - **Prerequisite urgency** (spec §12). `scoresWithPrerequisites` in `core/planner.ts` raises a task to the best score of anything waiting on it, down a chain, and `planDay` uses it. The reason reads "Needed for Read The Muqaddimah, due Tue 2pm". An "if" question waiting on it doesn't lower what it passes on. Automatic scheduling already places prerequisites first (13b).
+  - **Tests.**
+    - New: `server/db/schemaCheck.test.ts` rebuilds the real database's broken state by migrating a copy of the migrations with the original 0007. It shows deleting a session is refused there, repairs it, keeps the rows, and shows the delete rule then works. It also covers a missing table, an extra one, and a different column, and refusing to "repair" a column change. `planner.test` gained "a prerequisite inherits the urgency of what waits on it": on a full Tuesday (a class 10–11:30 and five other tasks), Get and Read both fit before 2pm with Get first; a Prep → Read → Get chain; and a prerequisite keeping its own higher score.
+    - Rewritten, because spec v0.7 deliberately changes what they check (AGENTS.md rule 4). `plan.test` "pencils tasks into today's free time" now plans Get at 4:15pm, then the reading at 4:45, and Prep at 9:30pm. "Re-plans the same way" went back to its pre-13b form: it resizes the Muqaddimah block, the first five stay the same, and the freed room takes one more.
+    - Setups adjusted so their tasks still rank among the Plan button's six now that the SOSC chain ranks high. What they assert didn't change. `quick.test` marks the SOSC chain finished in its setup. `conditions.test` ("never plans an unanswered if task") and `labels.test` give their test task a deadline on the planned day.
 

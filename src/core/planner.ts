@@ -202,6 +202,39 @@ export function scoreTask(t: PlanTask, date: string, c: PlanClock): { score: num
   return { score, reason };
 }
 
+/**
+ * Scores for a day, where a prerequisite scores at least as high as anything waiting on it, down a
+ * whole chain (Prep waits on Read, which waits on Get). It's planned first, so what waits on it
+ * still fits before its deadline. Its reason says what it's needed for.
+ */
+export function scoresWithPrerequisites(tasks: PlanTask[], date: string, c: PlanClock): Map<string, { score: number; reason: string }> {
+  const own = new Map(tasks.flatMap((t) => {
+    const s = scoreTask(t, date, c);
+    return s ? [[t.id, s] as const] : [];
+  }));
+  // What waits on each task, scored as it would be without inheriting.
+  const waiting = (id: string) => tasks.filter((t) => t.after?.taskId === id && !t.doneAt);
+  const best = (id: string, seen: Set<string>): { score: number; reason: string; title: string } | null => {
+    let top: { score: number; reason: string; title: string } | null = null;
+    for (const d of waiting(id)) {
+      if (seen.has(d.id)) continue;
+      const s = scoreTask({ ...d, ifPending: false }, date, c);
+      const deeper = best(d.id, new Set([...seen, d.id]));
+      const pick = deeper && (!s || deeper.score > s.score) ? deeper : s ? { ...s, title: d.title } : null;
+      if (pick && (!top || pick.score > top.score)) top = pick;
+    }
+    return top;
+  };
+  const out = new Map<string, { score: number; reason: string }>();
+  for (const [id, s] of own) {
+    const top = best(id, new Set([id]));
+    out.set(id, top && top.score > s.score
+      ? { score: top.score, reason: `Needed for ${top.title}, ${top.reason.charAt(0).toLowerCase()}${top.reason.slice(1)}` }
+      : s);
+  }
+  return out;
+}
+
 /** The latest a task can end on a day: 15 minutes before a timed deadline that day. */
 function limitOn(t: PlanTask, date: string, c: PlanClock, to: number): number {
   const due = dueOn(t, c.zone);
@@ -235,10 +268,11 @@ const batchable = (t: PlanTask) => !!t.quick && !t.after;
  */
 export function planDay(day: DayFree, tasks: PlanTask[], c: PlanClock, keep: Map<string, number> = new Map()): Placement[] {
   const busy = [...day.busy];
+  const scores = scoresWithPrerequisites(tasks, day.date, c);
   const scored = tasks
     .filter((t) => !t.scheduled && (!t.sometime || t.sometime.date === day.date))
     .flatMap((t) => {
-      const s = scoreTask(t, day.date, c);
+      const s = scores.get(t.id);
       return s ? [{ t, ...s, members: [t] }] : [];
     })
     .sort((a, b) => b.score - a.score);
