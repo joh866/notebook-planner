@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react';
 import { DateTime } from 'luxon';
 import type { CanvasSync, CategoryView, SettingsView } from '../shared/api';
+import { partnerOf, themeById, THEMES, type ThemeId } from '../shared/themes';
 import { fmtTime } from './format';
 import { categoryName, catStyle, CUSTOM_COLORS, findCategory, nextColor } from './cats';
 import { classTitle } from './ClassDialog';
@@ -30,6 +31,20 @@ function canvasWhen(at: string): string {
   const d = DateTime.fromISO(at).toLocal();
   const time = fmtTime(d.hour * 60 + d.minute);
   return d.hasSame(DateTime.local(), 'day') ? `today ${time}` : `${d.toFormat('LLL d')}, ${time}`;
+}
+
+/** A theme picker (spec §13). Its own kind (day or night) is listed first; any theme can be picked. */
+function ThemePick({ label, value, first, onPick }: { label: string; value: ThemeId; first: 'day' | 'night'; onPick: (id: ThemeId) => void }) {
+  const groups = first === 'day' ? (['day', 'night'] as const) : (['night', 'day'] as const);
+  return (
+    <select aria-label={label} value={value} onChange={(e) => onPick(e.target.value as ThemeId)}>
+      {groups.map((g) => (
+        <optgroup key={g} label={g === 'day' ? 'Day themes' : 'Night themes'}>
+          {THEMES.filter((x) => x.mode === g).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
 }
 
 /** A row of buttons where one is chosen. */
@@ -198,14 +213,6 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
         </section>
 
         <section>
-          <h3>Time log</h3>
-          <div className="srow">
-            <span className="grow sub2">What you finished, with the estimate next to how long it took.</span>
-            <button className="box boxbtn" onClick={onTimeLog}>Open</button>
-          </div>
-        </section>
-
-        <section>
           <h3>Look</h3>
           <div className="srow">
             <div className="grow">
@@ -213,6 +220,23 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
               <div className="sub2">Automatic switches to night at 8pm and back to day at 8am.</div>
             </div>
             <Seg label="Day or night" value={st.look} options={[['auto', 'Automatic'], ['day', 'Day'], ['night', 'Night']]} onPick={(look) => void patch({ look })} />
+          </div>
+          <div className="srow">
+            <span className="grow">Day theme</span>
+            <ThemePick label="Day theme" value={st.dayTheme} first="day"
+              onPick={(dayTheme) => void patch({ dayTheme, nightTheme: partnerOf(dayTheme) }, `${themeById(dayTheme)!.name} by day, ${themeById(partnerOf(dayTheme))!.name} at night.`)} />
+          </div>
+          <div className="srow">
+            <span className="grow">Night theme</span>
+            <ThemePick label="Night theme" value={st.nightTheme} first="night" onPick={(nightTheme) => void patch({ nightTheme })} />
+          </div>
+        </section>
+
+        <section>
+          <h3>Time log</h3>
+          <div className="srow">
+            <span className="grow sub2">What you finished, with the estimate next to how long it took.</span>
+            <button className="box boxbtn" onClick={onTimeLog}>Open</button>
           </div>
         </section>
 

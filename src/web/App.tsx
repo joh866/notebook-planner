@@ -136,9 +136,12 @@ export function App() {
   const zone = data?.day.zone ?? (now.zoneName || 'local');
   const zoned = now.setZone(zone);
   const look = lookForHour(zoned.hour, data?.settings.look ?? 'auto');
+  // The day theme by day and the night theme by night (spec §4, §13).
+  const theme = look === 'day' ? (data?.settings.dayTheme ?? 'notebook-day') : (data?.settings.nightTheme ?? 'notebook-night');
   useEffect(() => {
     document.body.dataset.mode = look;
-  }, [look]);
+    document.body.dataset.theme = theme;
+  }, [look, theme]);
 
   // The 60-second reload picks up the new day after 4am.
   const today = data?.day.today;

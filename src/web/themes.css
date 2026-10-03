@@ -1,0 +1,124 @@
+/* Themes (spec §4, "Themes"). Every theme is the same set of variables, with values taken exactly
+   from design/theme-samples.html (Notebook, Sleek) and design/theme-samples-3.html (the rest).
+   Sepia Paper, Hearth Dusk, Solarized Lite, Ember, Ink & Coral, and Harbor Dusk come from Candela
+   (MIT license, see THIRD_PARTY_NOTICES.md). Adding a theme is only a new block here plus a line
+   in src/shared/themes.ts. */
+
+/* Shared defaults. A theme only sets what differs. */
+body {
+  /* Type: the heading font (date, tabs, group names) and the body font. --h-scale sizes headings,
+     since a handwriting font runs small. */
+  --font-h:var(--hand); --font-b:var(--body); --h-scale:1;
+  /* Shape. */
+  --r-box:5px 7px 6px 4px; --r-panel:8px; --r-card:6px; --r-blk:3px 10px 4px 9px; --r-small:3px 7px 3px 6px; --cb-r:3px;
+  --bw:1.5px; --shadow:none; --blur:none; --blk-edge:0px; --rule-h:2px; --rule-op:.5;
+  /* Background. */
+  --pattern:none; --pattern-size:20px 20px; --pattern-attach:scroll;
+  /* Colors the samples don't set, worked out from the ones they do. */
+  --card-border:var(--line); --hl-ink:var(--ink);
+  --chip:color-mix(in srgb, var(--ink) 7%, transparent); --hover:color-mix(in srgb, var(--ink) 7%, transparent);
+  --past:color-mix(in srgb, var(--ink) 4.5%, transparent); --off:color-mix(in srgb, var(--ink) 3.5%, transparent);
+  --surround:color-mix(in srgb, var(--bg) 85%, var(--ink)); --scrim:color-mix(in srgb, var(--ink) 18%, transparent);
+  --hl-green:color-mix(in srgb, var(--c-growth) 32%, transparent); --amber:color-mix(in srgb, var(--c-errand) 70%, var(--ink));
+  --c-none:#8A8F99;
+}
+
+/* ---------- Notebook (the default pair) ---------- */
+body[data-theme="notebook-day"] {
+  --bg:#EEECE4; --dots:#C9C3B2; --ink:#253047; --muted:#6B7180; --line:#D6D0C0;
+  --panel:#F7F5EF; --card:#FCFBF8; --card-border:#D3CDBC; --frame:rgba(37,48,71,.55);
+  --accent:#2F4F9E; --red:#C2413B; --hl:rgba(224,177,42,.45);
+  --chip:rgba(37,48,71,.07); --hover:rgba(37,48,71,.07); --past:rgba(37,48,71,.045); --off:rgba(37,48,71,.035);
+  --surround:#D8D5CB; --scrim:rgba(30,36,51,.16); --hl-green:rgba(63,154,115,.32); --amber:#A8670F;
+  --c-class:#3D63C9; --c-errand:#E0B12A; --c-growth:#3F9A73; --c-life:#D46B95; --c-routine:#8A79C6; --fill:30%;
+  --pattern:radial-gradient(var(--dots) 1.1px, transparent 1.4px);
+}
+body[data-theme="notebook-night"] {
+  --bg:#1B2130; --dots:#2D3545; --ink:#E4DFD1; --muted:#979DAB; --line:#323A4C;
+  --panel:#20273A; --card:#252D41; --card-border:#3A4359; --frame:rgba(228,223,209,.42);
+  --accent:#93B1F2; --red:#EF7F73; --hl:rgba(232,193,78,.32);
+  --chip:rgba(228,223,209,.08); --hover:rgba(228,223,209,.08); --past:rgba(0,0,0,.16); --off:rgba(0,0,0,.14);
+  --surround:#10141D; --scrim:rgba(0,0,0,.35); --hl-green:rgba(108,199,158,.28); --amber:#E8B464;
+  --c-class:#7E9CF0; --c-errand:#E8C14E; --c-growth:#6CC79E; --c-life:#EE93B6; --c-routine:#ADA0EC; --fill:26%;
+  --pattern:radial-gradient(var(--dots) 1.1px, transparent 1.4px);
+}
+
+/* ---------- Sleek, and the themes built on its shapes ---------- */
+body[data-theme="sleek-light"], body[data-theme="sleek-dark"], body[data-theme="glass-light"], body[data-theme="glass-dark"],
+body[data-theme="mono"], body[data-theme="mono-night"], body[data-theme="sepia"], body[data-theme="hearth-dusk"],
+body[data-theme="solarized"], body[data-theme="ember"], body[data-theme="ink-coral"], body[data-theme="harbor-dusk"] {
+  --font-h:'Inter', system-ui, sans-serif; --font-b:'Inter', system-ui, sans-serif; --h-scale:.69;
+  --r-box:10px; --r-panel:10px; --r-card:10px; --r-blk:7px; --r-small:7px; --cb-r:50%;
+  --bw:1px; --shadow:0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.06); --blk-edge:3px; --rule-h:1px; --rule-op:.14;
+}
+body[data-theme="sleek-light"] {
+  --bg:#F4F5F7; --ink:#15171C; --muted:#6B7280; --line:#E6E8EC; --panel:#FFFFFF; --card:#FFFFFF; --frame:#E1E4E9;
+  --accent:#4F46E5; --red:#E5484D; --hl:rgba(79,70,229,.12); --hl-ink:var(--accent);
+  --c-class:#4F7CFF; --c-errand:#F5A524; --c-growth:#12B76A; --c-life:#EE4689; --c-routine:#9353D3; --fill:13%;
+}
+body[data-theme="sleek-dark"] {
+  --bg:#0E1014; --ink:#E8EAED; --muted:#98A0AB; --line:#232832; --panel:#151920; --card:#1A1F28; --frame:#2A303B;
+  --accent:#8B8BFF; --red:#FF6369; --hl:rgba(139,139,255,.18); --hl-ink:var(--accent); --shadow:0 1px 0 rgba(255,255,255,.03);
+  --c-class:#6E95FF; --c-errand:#F7B955; --c-growth:#32D583; --c-life:#F670A7; --c-routine:#B692F6; --fill:16%;
+}
+
+/* ---------- Glass ---------- */
+body[data-theme="glass-light"], body[data-theme="glass-dark"] {
+  --r-box:18px; --r-panel:18px; --r-card:18px; --r-blk:12px; --r-small:12px; --blk-edge:0px;
+  --blur:blur(16px) saturate(150%); --pattern-size:100% 100%; --pattern-attach:fixed;
+}
+body[data-theme="glass-light"] {
+  --bg:#DCE3F2; --pattern:radial-gradient(circle at 15% 20%, #F9C6D8 0, transparent 38%), radial-gradient(circle at 85% 30%, #B8D8FF 0, transparent 40%), radial-gradient(circle at 50% 90%, #C9F2E2 0, transparent 45%);
+  --panel:rgba(255,255,255,.5); --card:rgba(255,255,255,.62); --ink:#1D2433; --muted:#5A6378; --line:rgba(29,36,51,.1); --frame:rgba(255,255,255,.75); --accent:#4C6FFF; --red:#E5484D; --hl:rgba(255,255,255,.85);
+  --shadow:0 8px 30px rgba(31,38,135,.12); --fill:30%;
+  --c-class:#6F8CFF; --c-errand:#FFB547; --c-growth:#34C38F; --c-life:#FF6FA8; --c-routine:#A583FF;
+}
+body[data-theme="glass-dark"] {
+  --bg:#0D1222; --pattern:radial-gradient(circle at 15% 20%, rgba(141,92,246,.55) 0, transparent 40%), radial-gradient(circle at 85% 25%, rgba(34,197,229,.4) 0, transparent 42%), radial-gradient(circle at 50% 95%, rgba(236,72,153,.35) 0, transparent 45%);
+  --panel:rgba(255,255,255,.07); --card:rgba(255,255,255,.09); --ink:#EEF1FA; --muted:#A9B2CC; --line:rgba(255,255,255,.1); --frame:rgba(255,255,255,.16); --accent:#9DB2FF; --red:#FF7A85; --hl:rgba(255,255,255,.16);
+  --shadow:0 8px 30px rgba(0,0,0,.3); --fill:26%;
+  --c-class:#8EA6FF; --c-errand:#FFCB6B; --c-growth:#5EE2B0; --c-life:#FF8CC0; --c-routine:#C4A6FF;
+}
+
+/* ---------- Mono ---------- */
+body[data-theme="mono"], body[data-theme="mono-night"] {
+  --font-h:'Source Serif 4', Georgia, serif; --h-scale:.78; --r-box:2px; --r-panel:2px; --r-card:2px; --r-blk:2px; --r-small:2px; --cb-r:3px;
+  --shadow:none; --blk-edge:3px; --rule-h:2px; --rule-op:1;
+}
+body[data-theme="mono"] {
+  --bg:#F4F4F1; --panel:#FFFFFF; --card:#FFFFFF; --ink:#111111; --muted:#5C5C5C; --line:#E2E2DE; --frame:#111111; --accent:#111111; --red:#111111; --hl:#111111; --hl-ink:#FFFFFF; --fill:7%;
+  --c-class:#111111; --c-errand:#111111; --c-growth:#111111; --c-life:#111111; --c-routine:#111111;
+}
+body[data-theme="mono-night"] {
+  --bg:#121212; --panel:#1A1A1A; --card:#1F1F1F; --ink:#F0F0EE; --muted:#A3A3A0; --line:#2E2E2E; --frame:#F0F0EE; --accent:#F0F0EE; --red:#F0F0EE; --hl:#F0F0EE; --hl-ink:#121212; --fill:9%;
+  --c-class:#F0F0EE; --c-errand:#F0F0EE; --c-growth:#F0F0EE; --c-life:#F0F0EE; --c-routine:#F0F0EE;
+}
+
+/* ---------- From Candela (MIT) ---------- */
+body[data-theme="sepia"], body[data-theme="hearth-dusk"] { --font-h:'Source Serif 4', Georgia, serif; --h-scale:.78; }
+body[data-theme="solarized"], body[data-theme="ember"] { --font-h:'Newsreader', Georgia, serif; --h-scale:.81; }
+body[data-theme="ink-coral"], body[data-theme="harbor-dusk"] { --font-h:'Lora', Georgia, serif; --h-scale:.75; }
+body[data-theme="sepia"] {
+  --bg:#F2ECDF; --panel:#FBF7EE; --card:#FFFCF6; --ink:#322F28; --muted:#5F584B; --line:#E3DAC6; --frame:#D6CBB3; --accent:#9A5B2C; --red:#853E33; --hl:#E6DCC0; --hl-ink:#322F28;
+  --c-class:#30577D; --c-errand:#795B2F; --c-growth:#5A6B39; --c-life:#7B5595; --c-routine:#2C7567; --fill:15%;
+}
+body[data-theme="hearth-dusk"] {
+  --bg:#241C17; --panel:#2C231C; --card:#332920; --ink:#E8D6BC; --muted:#A89279; --line:#3B3026; --frame:#4E3F31; --accent:#F0A05A; --red:#F2705F; --hl:rgba(240,160,90,.22); --hl-ink:#E8D6BC; --shadow:none;
+  --c-class:#E8C88C; --c-errand:#F0A05A; --c-growth:#A8C47A; --c-life:#DD7F5E; --c-routine:#CF9A86; --fill:18%;
+}
+body[data-theme="solarized"] {
+  --bg:#F6EFD8; --panel:#FBF6E6; --card:#FFFBEE; --ink:#33362C; --muted:#5C5F52; --line:#E6DCC0; --frame:#D9CDAB; --accent:#1F6FA8; --red:#B7420F; --hl:#E9DFBF; --hl-ink:#33362C;
+  --c-class:#1F6FA8; --c-errand:#805B20; --c-growth:#5F7300; --c-life:#B02A68; --c-routine:#5257A8; --fill:14%;
+}
+body[data-theme="ember"] {
+  --bg:#292421; --panel:#322B27; --card:#3A322D; --ink:#E4D5B6; --muted:#A2937C; --line:#433A33; --frame:#574F45; --accent:#F0C05F; --red:#F4705E; --hl:rgba(240,192,95,.22); --hl-ink:#E4D5B6; --shadow:none;
+  --c-class:#93B3D0; --c-errand:#F0C05F; --c-growth:#B6C56B; --c-life:#D99BB0; --c-routine:#7CC3B4; --fill:18%;
+}
+body[data-theme="ink-coral"] {
+  --bg:#EEF0F0; --panel:#F8FAFA; --card:#FFFFFF; --ink:#222831; --muted:#4C545D; --line:#D8DEDE; --frame:#C9D1D1; --accent:#16467A; --red:#B0402F; --hl:rgba(176,64,47,.14); --hl-ink:#B0402F;
+  --c-class:#16467A; --c-errand:#A3581E; --c-growth:#2D7857; --c-life:#6B3FA0; --c-routine:#0E7683; --fill:13%;
+}
+body[data-theme="harbor-dusk"] {
+  --bg:#132939; --panel:#1D3749; --card:#234157; --ink:#DEE7ED; --muted:#95A6B2; --line:#2B4A60; --frame:#4F7087; --accent:#F3A068; --red:#F57466; --hl:rgba(243,160,104,.22); --hl-ink:#F3A068; --shadow:none;
+  --c-class:#74C2E7; --c-errand:#F3A068; --c-growth:#92CE8D; --c-life:#EC93B0; --c-routine:#C5A5E9; --fill:20%;
+}

@@ -1,5 +1,6 @@
 import { DateTime, IANAZone } from 'luxon';
 import { z } from 'zod';
+import { ThemeSchema, type ThemeId } from './themes';
 import {
   BlockKindSchema,
   DecisionYesSchema,
@@ -293,6 +294,8 @@ export const SettingsPatchSchema = z.strictObject({
   weekStart: z.union([z.literal(0), z.literal(1)]),
   notify: NotifySchema.partial(),
   canvasFeedUrl: z.url().nullable(),
+  dayTheme: ThemeSchema,
+  nightTheme: ThemeSchema,
 }).partial();
 
 // ---------- Responses ----------
@@ -663,6 +666,9 @@ export interface SettingsView {
   weekStart: number;
   notify: Notify;
   canvasFeedUrl: string | null;
+  /** Themes for the day and the night (spec §4, §13). */
+  dayTheme: ThemeId;
+  nightTheme: ThemeId;
   /** The last Canvas check, and what it found or why it failed (spec §14). */
   canvasSyncedAt: string | null;
   canvasNote: string | null;

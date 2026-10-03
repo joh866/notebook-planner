@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13g.
+Step 14.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -117,7 +117,11 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - Assignments become tasks with deadlines in Classes, matched to courses by code and marked "From Canvas."
   - Fetching again updates instead of duplicating, and never overwrites something the user changed.
   - Test with a saved sample feed.
-- [ ] **13g. Themes** (spec §4). Add a Theme setting with Notebook and Sleek (light and dark), matching `design/theme-samples.html`. Move every color, font, corner shape, and background pattern into theme variables, so adding another theme later is only a new set of values. Day and night keep switching automatically within Sleek. Then add any themes the user picked from `design/theme-samples-2.html`.
+- [x] **13g. Themes** (spec §4 and §13).
+  - Move every color, font, corner shape, and background pattern into theme variables, so adding a theme is only a new set of values.
+  - Themes come in day and night pairs, with the exact values in `design/theme-samples.html` (Notebook, Sleek) and `design/theme-samples-3.html` (the rest): Notebook day and night, Sleek light and dark, Glass light and dark, Mono and Mono night, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk.
+  - Settings, under Look, gets a Day theme and a Night theme, chosen separately. Picking a day theme pre-fills its partner. Automatic switching at 8am and 8pm stays.
+  - Six palettes come from Candela (MIT license), so include its license notice in the repo.
 
 ## Part 2: online
 
@@ -238,4 +242,15 @@ Agents add short notes here when a step is done.
   - **Web.** Cards say "From Canvas" (`fromCanvas`). Settings saves the link and then checks right away, shows "Checked today 2:15pm: 5 assignments, 4 new", and has Check now.
   - Tests: `tests/fixtures/canvas-feed.ics` (assignments with a time, a whole day, a `TZID` time, a folded line, a calendar event, a course that isn't theirs, and a past one), `core/ical.test.ts`, and `server/canvas.test.ts` (adds, updates without duplicating, keeps the user's changes and deletions, updates untouched fields, Undo, failures). No existing tests changed.
   - The real database has no Canvas link saved yet, so nothing has been fetched.
+- Step 13g:
+  - **Spec first.** v0.7 records the theme decisions in §4 (the seven day and night pairs, with exact values from the samples) and §13 (separate day and night themes; a day pick pre-fills its partner). Open question 5 is resolved, and there's a change log line.
+  - **Themes as values.** `src/web/themes.css` has a block per theme with the samples' exact values. Theme blocks are `body[data-theme=…]`.
+    - Shared defaults cover the rest: shapes (`--r-box`, `--r-panel`, `--r-card`, `--r-blk`, `--r-small`, `--cb-r`, `--bw`), shadow, glass blur, colored block edges (`--blk-edge`), the rule, the background pattern and its size and attachment, and the heading and body fonts with `--h-scale` (a sample's heading size ÷ Notebook's 32px).
+    - Colors the samples don't set (chip, hover, past, surround, scrim, amber, card border) are worked out from the theme's own colors with `color-mix`. Notebook keeps its exact earlier values for these.
+    - `styles.css` now uses only these variables: heading fonts are `var(--font-h)` at `calc(size * var(--h-scale))`, corners and frames use the shape variables, and the dot grid is `--pattern`. A small "theme extras" block at the end applies shadows, blur, and block edges.
+    - Adding a theme is one block in `themes.css` plus one line in `src/shared/themes.ts` (id, name, day or night, partner).
+  - **Settings.** Migration `0009` adds `settings.day_theme` and `night_theme`, defaulting to the Notebook pair. `PATCH /api/settings` checks them against `ThemeSchema`. Under Look are Day theme and Night theme pickers (each lists its own kind first). A day pick saves its partner as the night theme too. `App` sets `body[data-theme]` from the look, so automatic switching at 8am and 8pm works for every pair. `index.html` loads Inter, Source Serif 4, Newsreader, and Lora.
+  - **License.** `THIRD_PARTY_NOTICES.md` has Candela's MIT notice ("Copyright (c) 2026 Candela Themes", from its LICENSE on GitHub).
+  - Checked in the browser by switching `data-theme` only, so the saved settings weren't touched: Notebook looks as before, and Sleek light, Glass dark, Mono, Sepia Paper, and Harbor Dusk (at 390px) all render.
+  - Tests: `shared/themes.test.ts` (pairs point at each other), `web/themes.test.ts` (every theme has its own block with all colors, and nothing extra), and `server/themes.test.ts` (defaults, saving, an unknown theme refused). No existing tests changed.
 

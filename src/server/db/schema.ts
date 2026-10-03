@@ -252,6 +252,9 @@ export const settings = sqliteTable('settings', {
   notify: text('notify', { mode: 'json' }).notNull().$type<Notify>(),
   canvasFeedUrl: text('canvas_feed_url'),
   /** The last Canvas fetch, and what it found or why it failed (spec §14). Never the link itself. */
+  /** Themes (spec §4, §13): one for the day and one for the night. */
+  dayTheme: text('day_theme').notNull().default('notebook-day'),
+  nightTheme: text('night_theme').notNull().default('notebook-night'),
   canvasSyncedAt: text('canvas_synced_at'),
   canvasNote: text('canvas_note'),
 });

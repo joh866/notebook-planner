@@ -1,6 +1,6 @@
 # Product spec: personal planner
 
-Version 0.6, October 9, 2026. This replaces the September 25 spec from the first attempt.
+Version 0.7, October 9, 2026. This replaces the September 25 spec from the first attempt.
 This file is the source of truth. The latest prototype (`planner-prototype-6.html`) is the visual reference. Where the two disagree, this file wins.
 
 ---
@@ -111,12 +111,22 @@ Blocks are filled with the category color mixed into the card color (30% day, 26
 
 ### Themes
 
-Notebook is the default theme. The second theme is **Sleek** (light and dark), from `design/theme-samples.html`: Inter font, white or near-black panels, soft shadows, rounded corners, and colored left edges on blocks.
+Themes come in day and night pairs. They use the exact values in `design/theme-samples.html` (Notebook and Sleek) and `design/theme-samples-3.html` (the rest):
 
-More candidates are in `design/theme-samples-2.html`. Any picked from there get added the same way.
+| Day | Night |
+|---|---|
+| Notebook day (default) | Notebook night (default) |
+| Sleek light | Sleek dark |
+| Glass light | Glass dark |
+| Mono | Mono night |
+| Sepia Paper | Hearth Dusk |
+| Solarized Lite | Ember |
+| Ink & Coral | Harbor Dusk |
+
+Sepia Paper, Hearth Dusk, Solarized Lite, Ember, Ink & Coral, and Harbor Dusk come from Candela (MIT license), and its license notice is in the repo.
 
 - A theme is a set of the same variables: paper, ink, panel, card, accent, red, highlighter, category colors, the heading font, the body font, corner shapes, and the background pattern.
-- Day and night still apply to themes that have both versions.
+- The day theme is used by day and the night theme by night (next section).
 - Layout and behavior never change with the theme.
 
 ### Day and night
@@ -561,8 +571,8 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
 
 - **Your day:** usually up by (default 9am), usually asleep by (default 12am). This controls the folded hours and the planner's free time.
 - **Look:**
-  - Theme: Notebook (default) or Sleek, plus any added from the second samples page.
-  - Day or night: Automatic (8pm to 8am is night), Day, or Night.
+  - Day theme and Night theme, chosen separately (section 4, "Themes"). Picking a day theme pre-fills its partner as the night theme.
+  - Day or night: Automatic (8pm to 8am is night), Day, or Night. Automatic switching at 8am and 8pm stays.
 - **Time log:** opens the log (section 10).
 - **Time zone:** Automatic (from this device) or a specific zone. Home default is America/Chicago.
 - **Planning:**
@@ -683,7 +693,6 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 ## 18. Open questions
 
 1. Phone week: one day per row, or a time grid you swipe sideways?
-5. Whether to add any themes from `design/theme-samples-2.html`.
 7. Whether 15 minutes is the right cutoff for "quick," and 30 minutes the right size for a batch.
 2. Which online host to use. Decided at the "go online" step.
 3. Whether to keep the left rail's mini month and Coming up list, or use that space differently.
@@ -694,6 +703,7 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 9, 2026:** v0.7. Themes come in day and night pairs: Notebook, Sleek, Glass, Mono, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk, with exact values from the theme samples. Settings picks a day theme and a night theme separately, and a day theme pre-fills its partner. Six palettes come from Candela (MIT), so its license notice is in the repo.
 - **Oct 9, 2026:** v0.6. Themes: Notebook and Sleek. Conditions use look C.
 - **Oct 9, 2026:** v0.5. Notes from using the app (step 13).
   - Classes are never deadlines. Times are always 12-hour. Nothing lands in the past, and "today" after midnight means the coming day.
