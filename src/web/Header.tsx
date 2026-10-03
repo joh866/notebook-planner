@@ -56,9 +56,7 @@ export const allCards = (g: DayView['groups']): TaskCard[] =>
 function nextDeadlineText(day: DayView): string | null {
   const next = day.header.nextDeadline;
   if (!next) return null;
-  const all = allCards(day.groups);
-  const same = all.filter((t) => !t.doneAt && t.dueAt === next.dueAt && t.dueDate === next.dueDate).map((t) => t.shortName ?? t.title);
-  const names = same.length ? same : [next.name];
+  const names = day.nextDeadlineNames.length ? day.nextDeadlineNames : [next.name];
   const at = deadlineOn(next, day.zone)!;
   return `${joinAnd(names)}, ${relWord(day.today, at.date)}${at.min != null ? ` at ${fmtTime(at.min)}` : ''}.`;
 }

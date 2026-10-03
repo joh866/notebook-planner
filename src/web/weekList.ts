@@ -37,7 +37,8 @@ export function weekRows(day: DaySchedule): WeekRow[] {
       out.push({ ...base, text, look: x.kind === 'task' ? 'task' : 'event', categoryId: x.categoryId, done: x.done });
     }
   }
-  for (const s of day.sometime) {
+  // A day-only deadline is already listed as due.
+  for (const s of day.sometime.filter((x) => !x.due)) {
     out.push({ key: `st-${s.taskId}`, at: SOMETIME, time: 'Sometime', text: s.title, look: 'sometime', categoryId: s.categoryId, done: s.done });
   }
   return out

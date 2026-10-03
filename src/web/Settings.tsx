@@ -4,6 +4,7 @@ import { categoryName, catStyle, CUSTOM_COLORS, findCategory, nextColor } from '
 import { classTitle } from './ClassDialog';
 import { api, deviceZone, type Changed, type ClassRow, type SettingsPatch } from './client';
 import { XIcon } from './icons';
+import { TimePicker } from './TimePicker';
 import { clampDayTime, classLine, NOTIFY_ROWS, zoneCity, zoneList } from './settingsSheet';
 
 interface Props {
@@ -163,14 +164,14 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
         <section>
           <h3>Your day</h3>
           <p className="hint">The schedule opens on these hours, and the planner uses them for free time. Earlier and later hours fold away until you need them.</p>
-          <label className="srow">
+          <div className="srow">
             <span className="grow">Usually up by</span>
-            <Commit type="time" value={st.wakeTime} onCommit={(v) => dayTime('wake', v)} />
-          </label>
-          <label className="srow">
+            <TimePicker label="Usually up by" value={st.wakeTime} onCommit={(v) => dayTime('wake', v)} />
+          </div>
+          <div className="srow">
             <span className="grow">Usually asleep by</span>
-            <Commit type="time" value={st.bedTime} onCommit={(v) => dayTime('bed', v)} />
-          </label>
+            <TimePicker label="Usually asleep by" value={st.bedTime} onCommit={(v) => dayTime('bed', v)} />
+          </div>
         </section>
 
         <section>

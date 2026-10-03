@@ -445,6 +445,8 @@ export interface SometimeView {
   rolledFrom: string | null;
   /** How long its block is when it goes on the schedule (spec §12). */
   minutes: number;
+  /** It's here because it's due that day (a day-only deadline), not because it was picked for the day. */
+  due: boolean;
 }
 
 export interface DailyRow {
@@ -485,6 +487,8 @@ export interface DayView extends ViewContext, DaySchedule {
     overdue: { taskId: string; name: string }[];
     nextDeadline: { taskId: string; name: string; dueAt: string | null; dueDate: string | null } | null;
   };
+  /** The names of every unfinished task due at the next deadline's moment. A class is never one (spec §6). */
+  nextDeadlineNames: string[];
   /** The capacity warning under the header (spec §6), when the work due soon is more than half the free time before it. */
   capacity: CapacityView | null;
 }

@@ -63,7 +63,7 @@ export function Week({ week, settings, categories, nowMin, onOpenDay }: Props) {
             {d.deadlines.filter((x) => !x.done).map((x) => (
               <span key={x.taskId} className="d">{dueText(x)}</span>
             ))}
-            {d.sometime.map((s) => (
+            {d.sometime.filter((s) => !s.due).map((s) => (
               <span key={s.taskId} className={`s${s.done ? ' done' : ''}`} style={catStyle(categories, s.categoryId)}>
                 {s.title}
               </span>

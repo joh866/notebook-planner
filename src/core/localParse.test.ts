@@ -112,3 +112,16 @@ describe('clockFromText', () => {
     expect(clockFromText('1am', true)).toBe('01:00');
   });
 });
+
+describe('localParse with times in a line', () => {
+  it('reads "at 2:30pm today" as an event, not a "Label: time" line', () => {
+    expect(localParse('Meet Sam at 2:30pm today', TODAY)).toEqual([
+      expect.objectContaining({ type: 'event', title: 'Meet Sam', date: TODAY, start: '14:30' }),
+    ]);
+  });
+
+  it('puts a task for today with no time on today', () => {
+    expect(localParse('Call the bank today', TODAY)[0]).toMatchObject({ type: 'task', title: 'Call the bank', date: TODAY, win: 'near' });
+    expect(localParse('Call mom tomorrow', TODAY)[0]).not.toHaveProperty('date');
+  });
+});

@@ -266,7 +266,12 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .dialog label, .dialog .dlab { display:block; font-size:12.5px; color:var(--muted); margin-bottom:10px; }
 .dialog input { display:block; width:100%; margin-top:3px; border:1px solid var(--card-border); background:var(--card); border-radius:6px; padding:6px 9px; font-size:15px; color:var(--ink); }
 .dialog .row { display:flex; gap:10px; }
-.dialog .row label { flex:1; min-width:0; }
+.dialog .row label, .dialog .row .dlab { flex:1; min-width:0; }
+/* The 12-hour time picker (spec §4). */
+.tpick { display:inline-flex; align-items:center; gap:3px; }
+.tpick select { border:1px solid var(--card-border); background:var(--card); border-radius:6px; padding:5px 6px; font:inherit; font-size:14px; color:var(--ink); max-width:none; }
+.dialog .tpick { display:flex; margin-top:3px; }
+.dialog .tpick select { flex:1 1 0; min-width:0; font-size:15px; padding:6px 2px; }
 .dialog .days { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
 .dialog .days button { width:36px; height:32px; border:1px solid var(--card-border); background:var(--card); border-radius:6px; font-size:13px; }
 .dialog .days button[aria-pressed="true"] { background:var(--hl); border-color:var(--ink); font-weight:700; }
@@ -297,6 +302,7 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .sheet .hint { font-size:12.5px; color:var(--muted); margin:0 0 8px; }
 .sheet input, .sheet select { border:1px solid var(--card-border); background:var(--card); border-radius:6px; padding:5px 8px; font-size:14px; color:var(--ink); min-width:0; }
 .sheet select { max-width:60%; }
+.sheet .tpick select { padding:5px 4px; max-width:none; }
 .sheet input.wide { flex:1; }
 .sheet .boxbtn { font-family:var(--hand); font-size:20px; font-weight:600; height:32px; padding:0 12px; white-space:nowrap; }
 .sheet .cb { align-self:flex-start; margin-top:2px; }

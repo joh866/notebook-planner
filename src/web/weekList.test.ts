@@ -24,7 +24,7 @@ describe('weekRows', () => {
         { taskId: 'm', name: 'the Muqaddimah reading', dueAt: 'x', dueDate: null, atMin: 840, done: false },
         { taskId: 'x', name: 'finished', dueAt: 'x', dueDate: null, atMin: 600, done: true },
       ],
-      sometime: [{ taskId: 's', title: 'Shopping run', categoryId: 'errand', done: false, rolledFrom: null, minutes: 60 }],
+      sometime: [{ taskId: 's', title: 'Shopping run', categoryId: 'errand', done: false, rolledFrom: null, minutes: 60, due: false }],
     };
     expect(weekRows(day).map((r) => [r.time, r.text, r.look])).toEqual([
       ['9am', 'MATH 15300', 'skipped'],

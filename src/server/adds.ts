@@ -4,11 +4,13 @@ import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Hono } from 'hono';
 import { DateTime } from 'luxon';
 import { chunkText } from '../core/chunk';
+import { namesClass, type ClassName } from '../core/classes';
 import { addDays, dayOf, weekday } from '../core/day';
 import { localParse } from '../core/localParse';
 import { systemPrompt } from '../core/prompt';
 import { atMinute, clockOnDay, parseClock, resolveZone } from '../core/time';
 import { effectiveWindow } from '../core/urgency';
+import { twelveHour } from '../core/words';
 import { AddInputSchema, ZoneSchema, type AddResult, type AddedItem } from '../shared/api';
 import { categoryName, findCategory, nextColor } from '../shared/categories';
 import { readItems, type ParsedItem } from '../shared/parsed';
@@ -33,7 +35,10 @@ interface Ctx {
   zone: string;
   /** Deadlines are Chicago moments (spec §3). */
   homeZone: string;
+  /** The planner day (spec §3). */
   today: string;
+  /** The calendar day that just started, between midnight and 4am. Otherwise `today`. "Today" in the text means this day. */
+  calToday: string;
   /** #tags in the text. Only these can make new categories. */
   tags: Set<string>;
 }
@@ -57,12 +62,26 @@ function aroundLabel(m: number, note?: string): string {
 class Adder {
   private cats: Row[];
   private conditions: Row[];
+  private classes: ClassName[];
   private order = new Map<TableName, number>();
   added: AddedItem[] = [];
 
   constructor(private tx: Tx, private change: Change, private ctx: Ctx) {
     this.cats = tx.select().from(t.categories).all() as Row[];
     this.conditions = tx.select().from(t.conditions).all() as Row[];
+    this.classes = tx.select().from(t.classes).all();
+  }
+
+  /**
+   * The day a dated time lands on (spec §10, "Never in the past"). After midnight, a late-night
+   * time on the day that just started means tonight. With `roll`, a time that has already passed
+   * today means its next occurrence.
+   */
+  private landing(date: string, time: string, zone: string, roll: boolean): string {
+    const { today, calToday, now } = this.ctx;
+    if (date === calToday && date !== today && parseClock(time) < 4 * 60) date = today;
+    if (roll && (date === today || date === calToday) && clockOnDay(date, time, zone) < now) date = addDays(date, 1);
+    return date;
   }
 
   private insert(name: TableName, rows: Row[]) {
@@ -113,10 +132,20 @@ class Adder {
     return row.id as string;
   }
 
-  add(p: ParsedItem) {
+  add(raw: ParsedItem) {
+    // Times are always 12-hour (spec §4), including in text the AI wrote.
+    const p: ParsedItem = {
+      ...raw, title: twelveHour(raw.title), ...(raw.meta ? { meta: twelveHour(raw.meta) } : {}),
+      ...(raw.steps ? { steps: raw.steps.map((x) => ({ ...x, title: twelveHour(x.title) })) } : {}),
+    };
     if (p.type === 'class' && this.addClass(p)) return;
     if (p.type === 'routine') return this.addRoutine(p);
     if (p.type === 'event') return this.addEvent(p);
+    // A task for today, with no time, goes in today's Sometime lane (spec §7).
+    const { today, calToday } = this.ctx;
+    if ((p.date === today || p.date === calToday) && !p.due && p.win !== 'waiting' && p.win !== 'decide') {
+      return this.addTask(p, { window: 'near', sometime: calToday });
+    }
     this.addTask(p);
   }
 
@@ -125,13 +154,19 @@ class Adder {
     const row: Row = {
       id: randomUUID(), title: p.title, meta: p.meta ?? null, window,
       categoryId: this.category(p.cat, 'life'), sortOrder: this.nextOrder('tasks'),
-      shortName: p.short ?? null,
+      // Classes are never deadlines (spec §11): a short name that only names a class is dropped.
+      shortName: p.short && !namesClass(p.short, this.classes) ? p.short : null,
       estLow: p.est?.[0] ?? null, estHigh: p.est?.[1] ?? null,
       sittingMinutes: p.sitting ?? null, sessionMinutes: p.session ?? null,
     };
-    if (p.due && isDay(p.due.date)) {
-      if (p.due.time) row.dueAt = iso(clockOnDay(p.due.date, p.due.time, this.ctx.homeZone));
-      else row.dueDate = p.due.date;
+    // A task that only names a class meeting gets no deadline.
+    if (p.due && isDay(p.due.date) && !namesClass(p.title, this.classes)) {
+      const { homeZone, today, calToday } = this.ctx;
+      if (p.due.time) {
+        // After midnight, a deadline earlier "today" means the day that just started.
+        const date = this.landing(p.due.date, p.due.time, homeZone, today !== calToday);
+        row.dueAt = iso(clockOnDay(date, p.due.time, homeZone));
+      } else row.dueDate = p.due.date === today ? calToday : p.due.date;
     }
     if (window === 'waiting') row.conditionId = this.condition(p.wait ?? 'Has it happened yet?');
     if (window === 'decide') row.decisionYes = { makeTask: { title: p.title.replace(/\s*\?+\s*$/, ''), window: 'soon' } };
@@ -190,8 +225,9 @@ class Adder {
 
   /** An event with a time goes on the schedule. Without one, it's a task in that day's Sometime lane. */
   private addEvent(p: ParsedItem) {
-    const date = isDay(p.date) ? p.date : this.ctx.today;
-    if (!p.start) return this.addTask(p, { window: 'near', sometime: date });
+    let date = isDay(p.date) ? p.date : this.ctx.calToday;
+    if (!p.start) return this.addTask(p, { window: 'near', sometime: date === this.ctx.today ? this.ctx.calToday : date });
+    date = this.landing(date, p.start, this.ctx.zone, true);
     const start = dayMinute(p.start);
     let end = p.end ? dayMinute(p.end) : start + 60;
     if (end <= start) end = start + 60;
@@ -215,6 +251,7 @@ export function registerAdds(app: Hono, db: Db, run: Run, now: () => DateTime, s
     const zone = resolveZone(settings.timeZone, device ?? settings.homeTimeZone);
     const at = now();
     const today = dayOf(at, zone);
+    const calToday = at.setZone(zone).toFormat('yyyy-MM-dd');
 
     const system = systemPrompt({
       today,
@@ -231,12 +268,12 @@ export function registerAdds(app: Hono, db: Db, run: Run, now: () => DateTime, s
       if (r.status === 'fulfilled') return readItems(r.value);
       fellBack++;
       reason ??= r.reason instanceof Error ? r.reason.message : String(r.reason);
-      return localParse(chunks[i]!, today);
+      return localParse(chunks[i]!, calToday);
     });
 
     const tags = new Set([...text.matchAll(/#([\w-]+)/g)].map((m) => m[1]!.toLowerCase()));
     return c.json(run((tx, change): AddResult => {
-      const adder = new Adder(tx, change, { now: at, zone, homeZone: settings.homeTimeZone, today, tags });
+      const adder = new Adder(tx, change, { now: at, zone, homeZone: settings.homeTimeZone, today, calToday, tags });
       for (const item of items) adder.add(item);
       // With automatic scheduling on, new tasks that are due soon get penciled in (spec §12).
       const tasks = adder.added.filter((a) => a.kind === 'task');

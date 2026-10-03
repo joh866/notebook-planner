@@ -183,7 +183,7 @@ A line under the header separates it from the content. Below that line:
   - tasks rolled over from earlier days,
   - events with no time.
 
-  A chip leaves the lane once it gets a time on the schedule. The lane is a drop target, and its chips have a checkbox and an × to send them back to the list.
+  A chip leaves the lane once it gets a time on the schedule. The lane is a drop target, and its chips have a checkbox and an × to send them back to the list. A deadline's chip has no ×, since its due date keeps it there.
 - **Plan button (right):**
   - Reads "Plan today," "Plan tomorrow," or "Plan Friday" (the weekday, within a week; otherwise "Plan Oct 14").
   - After 9pm today, it plans tomorrow.
@@ -469,7 +469,7 @@ The AI returns JSON. Fields are left out when they don't apply.
 - **session:** minutes per session, for skill-building items.
 - **steps:** the parts of the task. Each step can have a length in minutes and be marked hands-on or waiting (laundry's wash cycle is waiting).
 - **repeat:** daily, or specific weekdays, weekly or every other week.
-- **date, start, end:** for events and classes.
+- **date, start, end:** for events and classes. A task meant for today with no time gets today's date, which puts it in the Sometime lane.
 - **loc:** the location.
 - **tentative:** for approximate times.
 - **if:** a condition question. **after:** the item it comes after, given as an existing id or the title of another item in the same text.

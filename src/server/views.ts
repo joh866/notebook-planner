@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
+import { deadlineName } from '../core/classes';
 import { blockLength } from '../core/length';
 import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask } from '../core/planner';
 import { classesOn, routineOccursOn, slotOn } from '../core/recurrence';
@@ -20,6 +21,7 @@ import type {
   RoutineItem,
   RoutineStepView,
   ScheduleItem,
+  SometimeView,
   StepView,
   TaskCard,
   WeekView,
@@ -156,24 +158,40 @@ function deadlinesOn(ctx: Ctx, date: string): DeadlineView[] {
   return ctx.data.tasks
     .filter((task) => deadlineDay(task, ctx.zone) === date)
     .map((task) => ({
-      taskId: task.id, name: task.shortName ?? task.title, dueAt: task.dueAt, dueDate: task.dueDate,
+      taskId: task.id, name: deadlineName(task, ctx.data.classes), dueAt: task.dueAt, dueDate: task.dueDate,
       atMin: task.dueAt ? minutesOnDay(utc(task.dueAt), date, ctx.zone) : null, done: !!task.doneAt,
     }))
     .sort((a, b) => (a.atMin ?? Infinity) - (b.atMin ?? Infinity));
 }
 
+/**
+ * The Sometime lane (spec §7): everything meant for the day that has no time yet. Tasks picked for
+ * the day (dragged in, typed as "today", rolled over, or events with no time), plus day-only
+ * deadlines due that day. A task leaves the lane once it has a block on that day.
+ */
+function laneFor(ctx: Ctx, date: string, schedule: ScheduleItem[]): SometimeView[] {
+  const placed = new Set(schedule.flatMap((x) => (x.type === 'block' && x.taskId ? [x.taskId] : [])));
+  const chip = (task: Rows<typeof t.tasks>[number], rolledFrom: string | null, due: boolean): SometimeView => ({
+    taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, rolledFrom, minutes: blockLength(task), due,
+  });
+  const out: SometimeView[] = [];
+  for (const s of ctx.data.sometime) {
+    const task = ctx.data.tasks.find((x) => x.id === s.taskId);
+    if (task && s.date === date && !placed.has(task.id)) out.push(chip(task, s.rolledFrom, false));
+  }
+  const picked = new Set(out.map((x) => x.taskId));
+  for (const task of ctx.data.tasks) {
+    if (task.dueDate === date && !task.dueAt && task.window !== 'decide' && !placed.has(task.id) && !picked.has(task.id)) {
+      out.push(chip(task, null, true));
+    }
+  }
+  return out;
+}
+
 function scheduleFor(ctx: Ctx, date: string): DaySchedule {
   const schedule: ScheduleItem[] = [...classItems(ctx, date), ...routineItems(ctx, date), ...blockItems(ctx, date)]
     .sort((a, b) => a.startMin - b.startMin);
-  const sometime = ctx.data.sometime
-    .filter((s) => s.date === date)
-    .flatMap((s) => {
-      const task = ctx.data.tasks.find((x) => x.id === s.taskId);
-      return task
-        ? [{ taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, rolledFrom: s.rolledFrom, minutes: blockLength(task) }]
-        : [];
-    });
-  return { date, schedule, deadlines: deadlinesOn(ctx, date), sometime };
+  return { date, schedule, deadlines: deadlinesOn(ctx, date), sometime: laneFor(ctx, date, schedule) };
 }
 
 function dailyRows(ctx: Ctx, date: string): DailyRow[] {
@@ -262,7 +280,7 @@ export function dayView(db: Db, now: DateTime, date: string | undefined, deviceZ
   const cards = new Map(ctx.data.tasks.map((task) => [task.id, taskCard(ctx, task)]));
   const g = groupTasks(ctx.data.tasks, now, ctx.zone, ctx.homeZone);
   const toCards = (list: { id: string }[]) => list.map((x) => cards.get(x.id)!);
-  const name = (task: Rows<typeof t.tasks>[number]) => task.shortName ?? task.title;
+  const name = (task: Rows<typeof t.tasks>[number]) => deadlineName(task, ctx.data.classes);
 
   const next = ctx.data.tasks
     .filter((task) => !task.doneAt && !isOverdue(task, now, ctx.homeZone) && deadlineMoment(task, ctx.homeZone))
@@ -288,6 +306,13 @@ export function dayView(db: Db, now: DateTime, date: string | undefined, deviceZ
       overdue: g.overdue.map((task) => ({ taskId: task.id, name: name(task) })),
       nextDeadline: next ? { taskId: next.id, name: name(next), dueAt: next.dueAt, dueDate: next.dueDate } : null,
     },
+    // Every unfinished task due at the next deadline's moment, named together.
+    nextDeadlineNames: next
+      ? ctx.data.tasks
+        .filter((task) => !task.doneAt && task.dueAt === next.dueAt && task.dueDate === next.dueDate)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(name)
+      : [],
     capacity: capacity(plan.tasks(), plan.clock, (d) => plan.day(d), plan.setAside()),
   };
 }

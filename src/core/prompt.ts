@@ -25,8 +25,17 @@ export function systemPrompt(ctx: PromptContext): string {
     ? ctx.classes.map((c) => `${c.code} ${c.kind} ${c.days.map((d) => SHORT_DAYS[d]).join('/')} ${c.start}-${c.end}`).join('; ')
     : 'none';
   const custom = ctx.customCategories.map((n) => `, "${n.toLowerCase()}"`).join('');
+  // Between midnight and 4am the planner day is still the night before, but "today" means the
+  // calendar day that just started (spec §10, "Never in the past").
+  const cal = ctx.time < '04:00' ? addDays(ctx.today, 1) : null;
+  const now = cal
+    ? `It's just after midnight (${ctx.time}): ${DAYS[weekday(ctx.today)]} night, so the calendar date is ${DAYS[weekday(cal)]} ${cal}.`
+    : `Today is ${DAYS[weekday(ctx.today)]} ${ctx.today}, and the time is ${ctx.time}.`;
+  const night = cal
+    ? `\n- Since it's after midnight, "today" means ${cal}, the day that just started: "2:30pm today" is ${cal} at 14:30. Late-night times up to 4am, like "1am", still mean tonight: date ${ctx.today} with that time.`
+    : '';
 
-  return `You turn quick notes into planner items for a college student. Today is ${DAYS[weekday(ctx.today)]} ${ctx.today}, and the time is ${ctx.time}.
+  return `You turn quick notes into planner items for a college student. ${now}
 Next 14 days: ${next.join(', ')}.
 Their weekly classes: ${classes}.
 
@@ -38,7 +47,8 @@ Fields:
 - cat: "class" (schoolwork), "errand" (buying, fixing, admin), "growth" (skills, projects, career), "life" (health, social, chores), "routine"${custom}. If the line has a #tag, use the tag word as cat, even if it's new.
 - win (tasks): "near" = today or tomorrow, "week" = within about a week, "soon" = no rush, "ongoing" = open-ended skill building, "waiting" = depends on something that hasn't happened, "decide" = has "?", "maybe", "not sure", or needs a judgment call.
 - due (tasks): {"date":"YYYY-MM-DD","time":"HH:MM"}, only if they gave a deadline. "before class" means that class's start time on that day. Leave out time if none was given.
-- short: a 2-4 word name for a deadline ("Math PSet 2").
+- date (tasks): today's date, when a task is for today but has no time and no deadline ("call mom today"). It goes on today's list.
+- short: a 2-4 word name for a deadline that says what the work is ("Math PSet 2"), never a class's name.
 - est: [low, high] minutes, an honest range. Readings and problem sets get wide ranges.
 - sitting: minutes for one work session when the task is big.
 - session: minutes per session for ongoing skill items.
@@ -51,6 +61,9 @@ Fields:
 - tentative: true when a time is approximate ("around 7?", "depends on friends").
 Rules:
 - Never invent a date, time, or deadline that wasn't given. Put vague timing in win instead.
+- Classes are never deadlines, and a class meeting is never a task. Work due "before the next ECON lecture" is due at that class's start, and its short name says what the work is ("ECON notes review", not "ECON lecture").
+- Nothing new goes in the past. A time with no date is its next occurrence.${night}
+- Write any time inside title, meta, or steps in 12-hour form ("1:30pm", "11am"), never 24-hour. Only the date, start, end, and due fields use HH:MM.
 - Times from 00:00 to 04:00 belong to the night of the given day: an event on today's date at 00:30 is tonight after midnight.
 - Fix obvious am/pm slips (going to sleep at "12:30pm" means 00:30).
 - Split lines that contain several separate things. Skip headings, dates used only as headers, and filler.

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type ClassInput, type ClassRow } from './client';
+import { TimePicker } from './TimePicker';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const EMPTY: ClassInput = { code: '', kind: 'Lecture', fullName: null, days: [], start: '10:00', end: '10:50', location: null };
@@ -139,14 +140,14 @@ export function ClassDialog({ classId, zone, weekStart, onClose, onDone }: Props
               </div>
             </div>
             <div className="row">
-              <label>
+              <div className="dlab">
                 Starts
-                <input type="time" value={v.start} onChange={(e) => set('start', e.target.value)} />
-              </label>
-              <label>
+                <TimePicker label="Starts" value={v.start} onChange={(t) => set('start', t)} />
+              </div>
+              <div className="dlab">
                 Ends
-                <input type="time" value={v.end} onChange={(e) => set('end', e.target.value)} />
-              </label>
+                <TimePicker label="Ends" value={v.end} onChange={(t) => set('end', t)} />
+              </div>
             </div>
             {away && <p className="hint">Times are in {row.timeZone.split('/').pop()!.replace(/_/g, ' ')} time.</p>}
             <label>

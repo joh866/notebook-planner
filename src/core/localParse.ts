@@ -118,7 +118,8 @@ export function localParse(text: string, today: string): ParsedItem[] {
 
     // ---- A time plan for today: "Right now: 5:30pm", "Dinner: Around 7:00pm? Contingent" ----
     // Outside a plan, a "Label: time" line with am or pm is one too.
-    const labeled = bullet ? null : /^([^:]{1,40}):\s*(.+)$/.exec(line);
+    // The label can't end in a digit, so the colon in "at 2:30pm" isn't one.
+    const labeled = bullet ? null : /^([^:]{0,39}[^:\d]):\s*(.+)$/.exec(line);
     const planLine = labeled && (plan || /\d\s*(am|pm)\b/i.test(labeled[2]!)) ? labeled : null;
     if (planLine) {
       const label = planLine[1]!.trim();
@@ -215,6 +216,8 @@ export function localParse(text: string, today: string): ParsedItem[] {
       item.wait = cond ? `${cap(tidy(`${cond[1]} ${cond[2]}`))}?` : 'Has it happened yet?';
       if (cond) main = tidy(main.replace(cond[0], ''));
     }
+    // A task for today, with no time, goes in today's Sometime lane (spec §7).
+    if (!item.due && item.win !== 'waiting' && item.win !== 'decide' && /\b(today|tonight)\b(?![’'])/i.test(main)) item.date = today;
     main = tidy(main.replace(/\b(this week|today|tomorrow|tonight)\b(?![’'])/i, ''));
 
     const tag = /#([\w-]+)/.exec(main);

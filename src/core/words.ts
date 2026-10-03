@@ -33,3 +33,22 @@ export function dueLabel(today: string, date: string, atMin: number | null): str
   const day = n === 0 ? 'today' : n === 1 ? 'tomorrow' : Math.abs(n) < 7 && n !== -1 ? SHORT_DAYS[weekday(date)]! : relWord(today, date);
   return atMin == null ? day : `${day}${Math.abs(n) >= 7 ? ',' : ''} ${fmtTime(atMin)}`;
 }
+
+const CLOCK = String.raw`([01]?\d|2[0-3]):([0-5]\d)(?!\s*(?:am|pm|a\.m\.|p\.m\.))`;
+const AFTER_WORD = new RegExp(String.raw`\b(at|by|before|after|from|until|till|around|starting|ending)\s+${CLOCK}\b`, 'gi');
+const RANGE = new RegExp(String.raw`\b${CLOCK}\s*[-–]\s*${CLOCK}\b`, 'g');
+const clock12 = (h: string, m: string) => fmtTime(Number(h) * 60 + Number(m));
+
+/**
+ * Times are always 12-hour (spec §4). Turns "at 13:30" and "13:00–14:30" in text the AI wrote into
+ * "at 1:30pm" and "1–2:30pm". Only times after a word like "at", or in a range, so "John 3:16" stays.
+ */
+export function twelveHour(text: string): string {
+  return text
+    .replace(RANGE, (_, h1: string, m1: string, h2: string, m2: string) => {
+      const a = clock12(h1, m1);
+      const b = clock12(h2, m2);
+      return `${a.slice(-2) === b.slice(-2) ? a.slice(0, -2) : a}–${b}`;
+    })
+    .replace(AFTER_WORD, (_, w: string, h: string, m: string) => `${w} ${clock12(h, m)}`);
+}

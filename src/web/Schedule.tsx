@@ -143,13 +143,13 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
               key={s.taskId}
               className={`chip${s.done ? ' done' : ''}`}
               style={catStyle(categories, s.categoryId)}
-              onPointerDown={(e) => !s.done && drag.begin(e, { type: 'sometime', taskId: s.taskId, title: s.title, minutes: s.minutes }, e.currentTarget)}
+              onPointerDown={(e) => !s.done && drag.begin(e, { type: s.due ? 'task' : 'sometime', taskId: s.taskId, title: s.title, minutes: s.minutes }, e.currentTarget)}
             >
               <Check checked={s.done} label={s.title} onToggle={() => onCheckTask(s.taskId, !s.done)} />
               <i className="dot"></i>
               <span>{s.title}</span>
               {s.rolledFrom && <em className="from">from {relWord(day.today, s.rolledFrom)}</em>}
-              <Del label={`Back to the list: ${s.title}`} onClick={() => onClearSometime(s.taskId)} />
+              {s.due ? <em className="from">due</em> : <Del label={`Back to the list: ${s.title}`} onClick={() => onClearSometime(s.taskId)} />}
             </div>
           ))}
         </div>
