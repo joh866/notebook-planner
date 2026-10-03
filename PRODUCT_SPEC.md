@@ -1,6 +1,6 @@
 # Product spec: personal planner
 
-Version 0.4, October 2, 2026. This replaces the September 25 spec from the first attempt.
+Version 0.6, October 9, 2026. This replaces the September 25 spec from the first attempt.
 This file is the source of truth. The latest prototype (`planner-prototype-6.html`) is the visual reference. Where the two disagree, this file wins.
 
 ---
@@ -57,7 +57,12 @@ The engineering practices were good and are worth keeping (section 15).
 - **Shared tools:** Zod for data shapes shared by server and web, Luxon for dates and time zones, and Vitest for tests.
 - **AI:** the Anthropic TypeScript SDK on the server, reading the key from a `.env` file. The model name is also set in `.env`.
 - **Drag and drop:** ported from the prototype's own pointer code, which already handles mouse and touch.
-- **Online host:** chosen at the "go online" step, not now.
+- **Online host:** a DigitalOcean droplet (a small rented Linux server that's always on). See step 14 in PROGRESS.md.
+  - HTTPS with a domain name, which is required for installing the app and for notifications.
+  - The app runs as a service that restarts on its own.
+  - The SQLite file lives on the droplet and is backed up nightly somewhere off the droplet.
+  - One-person sign-in.
+- **"An app":** the web app installed to the phone's home screen. It gets an icon, opens full screen, and can send notifications. An App Store app isn't needed. It could be wrapped later if ever wanted.
 
 ## 4. Visual design: Notebook
 
@@ -68,6 +73,7 @@ The engineering practices were good and are worth keeping (section 15).
 - Square checkboxes with a drawn tick.
 - Highlighter-style fills for category colors.
 - Handwriting font only for headings, the date, tabs, buttons, and notes in red pen. Everything else uses a highly legible body font.
+- **Times are always 12-hour** ("1:30pm"), everywhere: labels, time pickers, messages, and text the AI writes into titles and notes. Use our own time picker, since the browser's built-in one follows the computer's 24-hour setting.
 
 ### Fonts
 
@@ -102,6 +108,16 @@ Category colors, Highlighter palette (chosen over Ink and Quiet):
 | Calendar imports / none | #8A8F99 | #8A8F99 |
 
 Blocks are filled with the category color mixed into the card color (30% day, 26% night). Custom categories get colors from a rotating set: #E07B39, #2BA5A5, #C9443A, #7A8B2E, #B05FC4, #4A90D9.
+
+### Themes
+
+Notebook is the default theme. The second theme is **Sleek** (light and dark), from `design/theme-samples.html`: Inter font, white or near-black panels, soft shadows, rounded corners, and colored left edges on blocks.
+
+More candidates are in `design/theme-samples-2.html`. Any picked from there get added the same way.
+
+- A theme is a set of the same variables: paper, ink, panel, card, accent, red, highlighter, category colors, the heading font, the body font, corner shapes, and the background pattern.
+- Day and night still apply to themes that have both versions.
+- Layout and behavior never change with the theme.
 
 ### Day and night
 
@@ -153,14 +169,21 @@ The order is: Back to today (when shown), Day, Week, Month, then Settings.
 A line under the header separates it from the content. Below that line:
 
 - **Overdue:** red, for example "Overdue: the Muqaddimah reading."
-- **Next deadline:** for example "Next deadline: Math PSet 1, tomorrow at 11am."
+- **Next deadline:** for example "Next deadline: Math PSet 1, tomorrow at 11am." Only tasks have deadlines. A class is never shown as due, even when a task is due at that class's start time.
 - **Capacity warning:** amber, shown only when it applies. "Heads up" means the work due is more than 50% of your free time before the deadline; "Tight" means more than 80%. Example: "Tight: about 5h of work is due by Tuesday at 2pm, and you have about 4h of free time before then."
 
 ## 7. Day view
 
 ### Top row of the schedule panel
 
-- **Sometime today (left):** the "Sometime today" lane. Holds tasks committed to the day without a time. It's a drop target, and its chips have a checkbox and an × to send them back to the list.
+- **Sometime today (left):** the "Sometime today" lane. It holds everything meant for that day that has no time yet:
+  - tasks you dragged there,
+  - tasks the add box understood as "today" without a time,
+  - day-only deadlines due that day,
+  - tasks rolled over from earlier days,
+  - events with no time.
+
+  A chip leaves the lane once it gets a time on the schedule. The lane is a drop target, and its chips have a checkbox and an × to send them back to the list.
 - **Plan button (right):**
   - Reads "Plan today," "Plan tomorrow," or "Plan Friday" (the weekday, within a week; otherwise "Plan Oct 14").
   - After 9pm today, it plans tomorrow.
@@ -193,6 +216,9 @@ A line under the header separates it from the content. Below that line:
 | Tentative event ("around 7") | Dashed outline, "Around 7, depends on friends" | Moving it updates "Around X" |
 | Open time | Hatched, behind other blocks | Counts as free time for the planner |
 | Missed task | Red outline, "Not done yet" | A task block whose time has passed today while it's still unchecked |
+| Item with a condition ("if" or "after") | Faded, with diagonal stripes and a dashed left edge, and the condition in small text under the title ("if it's open," "after Get The Muqaddimah"). This is look C. | Stays at its time. When that time comes, the block itself asks "Still on? Yes / No" (and so does its popover). An "after" item goes back to normal once its prerequisite is done. |
+| Quick things | One block listing several short tasks, each with its own checkbox | Drag a task out to unbatch it, or drop a short task onto it to add it. |
+| Logged task | A normal block at the time it actually happened, checked, with the actual length ("3:46–5:08pm, 82 min") | Created when you report what you did (section 10, "Actual time and the time log"). |
 | Task with waiting time (laundry) | A light bar spans the whole time. Hands-on parts are solid blocks, and waiting parts are hatched and labeled ("Washing, 55m"). | Other things can be placed during the waiting parts. Moving it moves all the parts together. |
 
 Every block has the following:
@@ -245,19 +271,22 @@ All, Classes, Errands, Growth, Life, plus any custom categories. These double as
 
 ### Groups, in order
 
+0. **Check-ins:** a strip at the very top, shown only when a question is unanswered. For example: "Is the cold fully gone? Yes / Not yet." See "Conditions" in section 10.
 1. **Daily:** the checklist for the selected day.
    - Shows the daily routines plus any weekly ones that fall on that day, like laundry on Saturday.
    - Each row has a checkbox and shows its time if it's on the schedule.
-   - Streaks are shown, for example "4-day streak."
+   - A routine with steps opens to show them (morning routine: brush teeth, shower, and so on), each with its own checkbox. The row shows progress ("3 of 6").
+   - Streaks are shown, for example "4-day streak." A streak can belong to a step, like gratitude.
    - Rows can be deleted with the trash icon.
 2. **Overdue:** red heading. Cards have a red left edge and a solid red "Was due Tue 2pm" chip.
 3. **Today or tomorrow**
 4. **This week**
 5. **Soon**
-6. **Waiting on something:** grouped under check-in questions with Yes and Not yet buttons (section 10).
-7. **Needs a decision:** "?" items with Yes and No.
-8. **Ongoing:** skill-building with no end date.
-9. **Done:** collapsed, with a count.
+6. **Needs a decision:** "?" items with Yes and No.
+7. **Ongoing:** skill-building with no end date.
+8. **Done:** collapsed, with a count. A "Time log" link at the bottom opens the log (section 10).
+
+There's no separate Waiting group anymore. Tasks with a condition stay in their own time window and carry an "if" or "after" tag.
 
 Within a group, tasks with deadlines come first, earliest first.
 
@@ -329,9 +358,63 @@ At 4am, any unfinished task that was scheduled on, or committed to, a past day m
 - Today or tomorrow: moves to Today or tomorrow.
 - Past the deadline: moves to Overdue.
 
-### Check-ins for waiting tasks
+### Conditions: "if" and "after"
 
-A waiting task is attached to a question, like "Is the cold fully gone?". Answering Yes moves every task under that question to Soon (Gym and Check out boxing club together). Not yet hides the question until tomorrow.
+Being contingent is a property of a task or event, not a group. There are two kinds:
+
+- **If:** a yes/no question. Examples: "if the go club is open," "once the cold is fully gone," "if I get into ARCH."
+- **After:** another task or event. Examples: "after Get The Muqaddimah," "after the MTG event."
+
+How they look and behave:
+- **Look (C):** faded, striped, with a dashed left edge and the condition in small text, on cards and on schedule blocks alike. It looks penciled-in and unsure until the condition is met.
+- **Placement:** an item keeps its normal time window. If it has a time, it sits on the schedule at that time.
+- **Check-ins:** unanswered "if" questions appear in the Check-ins strip at the top of the task list.
+  - Yes clears that condition from every item that has it, so Gym and Check out boxing club both become normal tasks.
+  - Not yet hides the question until tomorrow.
+- **Timed "if" items:** when their time comes, the block asks "Still on? Yes / No." Yes makes it a normal item. No removes it, with Undo.
+- **"After" items:** an item is ready once its prerequisite is done, or later on the same day the prerequisite is scheduled.
+- **The planner:**
+  - It never plans an "if" item until its question is answered Yes.
+  - It never places an "after" item before its prerequisite. "Read The Muqaddimah" can't land before "Get The Muqaddimah."
+
+### Never in the past
+
+- New things never land in the past. A time with no date means its next occurrence.
+- Between midnight and 4am, "today" in the add box means the calendar day that just started. At 12:47am, "2:30pm today" means 2:30pm that coming afternoon, not 14 hours ago. Late-night hours like "1am" still mean tonight.
+- The Plan button and automatic scheduling never place anything before now.
+- The one exception is reporting something you already did (the next section).
+
+### Actual time and the time log
+
+- **Recording actual time:** a task can record how long it really took, as one or more sessions with a start and an end. There are three ways to record it:
+  - The add box: "sosc reading done (82 minutes starting at 3:46pm)."
+  - A Start and Stop button on a task's block or card.
+  - The rough "How long did it take?" answer.
+- **Reporting what you did:** when you report a finished task with a time:
+  - Its block moves to when it actually happened (3:46–5:08pm) and is checked off.
+  - If that overlaps a past event, the event's end is trimmed to when you switched. The RSO fair would then end at 3:46pm.
+  - The message lists every change, with one Undo for all of them.
+- **Partial progress:** "did 40 minutes of the reading" records a session without finishing the task, and the remaining estimate shrinks.
+- **The time log:** opened from the Done group or from Settings. It lists finished tasks, newest first, with the estimate next to the actual time. Entries can be edited.
+- **Better estimates:**
+  - The add box receives your recent actual times (about the last 40 finished tasks) and your average by category, so new estimates match how fast you actually are.
+  - Small chores get lean estimates, like 10–15 minutes to organize a drawer rather than 20–45.
+  - Changing an estimate on a card is remembered too.
+
+### Routine steps
+
+- A routine can have steps, which check off per day.
+  - Checking the routine checks all its steps.
+  - Checking every step checks the routine.
+- Steps can have lengths. The routine's block length is their total unless you set one.
+- Morning and night routines start with the steps in section 16.
+
+### Quick things
+
+- **What counts:** any task estimated at 15 minutes or less, like a text, an email, a quick reply, or a tiny chore. The add box marks messages and tiny chores as quick.
+- **Batching:** the planner groups quick tasks into one "Quick things" block, usually 30 minutes at most, instead of scattering them across the day.
+- **Making your own:** dropping a short task onto any quick block adds it to that batch.
+- **Daily small things:** recurring ones, like supplements, are a routine with steps instead (section 16).
 
 ### Decisions
 
@@ -351,6 +434,23 @@ Anything from one line to a full messy brain dump, including the user's original
 - **Remarks in parentheses that describe the item:** "(no specific due date)," "(contingent)," "(daily thing)," "(weekly thing on saturday)," "(biweekly)," "(near near future)," "(near future, about a week)," "(judgment needed)," "maybe," and "?".
 - **A time plan for today:** "Right now: 5:30pm," "Dinner: around 7? contingent," "Sleep by 11:30–12:30pm." These become events for today. Approximate ones are tentative, and obvious am/pm slips get fixed.
 - **Several things on one line**, which get split.
+- **Changes to existing things**, not just new ones:
+  - Finishing: "sosc reading done."
+  - Deleting: "delete the blanket thing."
+  - Editing: "math pset is due thursday now."
+  - Moving: "move laundry to Sunday."
+  - Checking a step: "finished chapter 2."
+  - Reporting time: "82 minutes starting at 3:46pm."
+- **A plan for the day, with order and soft times.** Example: "go to mtg event at crerar library preferably before 1:30pm, head to go club after asap and stop by if its open, meet with friends at around 4 to go to gym for 90 minutes." The phrases mean:
+  - "around 4" is a tentative 4pm.
+  - "preferably before 1:30pm" means start by then, so a tentative 1:15pm marked flexible.
+  - "after X" means right after X, linked with an "after" condition.
+  - "asap" means the earliest free time, after any prerequisite.
+  - "for 90 minutes" is the length.
+  - "if it's open" and "stop by if" make an "if" condition.
+  - Unknown lengths default to about an hour for events and about 30 minutes for quick stops.
+
+  That example becomes the MTG event at Crerar Library at about 1:15pm; the go club right after it, if it's open; and the gym with friends at about 4–5:30pm.
 - **#tags for category:** "#errands" files the item under Errands, and a new #name creates a new category.
 
 ### Output per item
@@ -361,24 +461,32 @@ The AI returns JSON. Fields are left out when they don't apply.
 - **title:** short, starting with a verb for tasks.
 - **meta:** a one-line note.
 - **cat:** a built-in or custom category.
-- **win:** near, week, soon, ongoing, waiting, or decide.
+- **win:** near, week, soon, ongoing, or decide.
 - **due:** a date, plus a time only if one was given.
 - **short:** a 2–4 word name for deadlines.
 - **est:** an honest range in minutes.
 - **sitting:** the length of one work session, for big tasks.
 - **session:** minutes per session, for skill-building items.
 - **steps:** the parts of the task. Each step can have a length in minutes and be marked hands-on or waiting (laundry's wash cycle is waiting).
-- **wait:** a yes/no check-in question.
 - **repeat:** daily, or specific weekdays, weekly or every other week.
 - **date, start, end:** for events and classes.
 - **loc:** the location.
 - **tentative:** for approximate times.
+- **if:** a condition question. **after:** the item it comes after, given as an existing id or the title of another item in the same text.
+- **quick:** true for tasks of about 15 minutes or less.
+- **Changes to existing items:** returned separately, each with an action (done, delete, update, move, check step, or log time), the id of an existing item, and the changed fields. Logged time comes as a start and a length.
 
 ### Rules
 
 - Never invent a date, time, or deadline that wasn't given.
 - Times between midnight and 4am belong to the night of the given day.
 - The AI receives today's date, the next 14 days with their weekdays, the current time, and the user's classes, so "before class" and "Tuesday" resolve correctly.
+- It also receives the current tasks, routines, and today's and tomorrow's schedule (ids, titles, notes, and times), so it can refer to existing items. It also gets your recent actual times, for estimates.
+- New items never land in the past, and "today" after midnight means the calendar day that just started (section 10).
+- Times in any text the AI writes use 12-hour format ("1:30pm").
+- Classes are never given deadlines.
+- If the text implies the answer to an open check-in, the message offers to answer it. For example, "gym with friends at 4" leads to "Is the cold fully gone? Yes."
+- When it's unclear which existing item is meant, nothing changes. The message asks which one, with a button for each match.
 
 ### Long input
 
@@ -390,7 +498,7 @@ The AI returns JSON. Fields are left out when they don't apply.
 
 - Items are added right away with no preview step.
 - New cards flash briefly and scroll into view. On the phone, the drawer opens.
-- The message says exactly what happened, for example: "Added 'Get razor' to This week, penciled in Friday at 4pm."
+- The message says exactly what happened, for example: "Added 'Get razor' to This week, penciled in Friday at 4pm." For changes, it might say: "Marked 'Read The Muqaddimah' done, 3:46–5:08pm (82 min). Ended RSO fair at 3:46pm." One Undo covers everything from one entry.
 
 ### Manual category change
 
@@ -429,7 +537,7 @@ Free time is from your wake time (or now, plus 10 minutes, if planning today) un
 | Has a deadline | plus 90 ÷ (days left + 1), plus 4 per hour of the high estimate |
 | Committed to this day (Sometime lane, or rolled over) | plus 200 |
 
-Waiting and decision items are never planned. A task due on the target day must end at least 15 minutes before its deadline.
+Decision items are never planned, and neither are "if" items whose question is unanswered. "After" items are placed only after their prerequisite. Nothing is placed before now. Quick tasks are batched into "Quick things" blocks. A task due on the target day must end at least 15 minutes before its deadline.
 
 ### Block length
 
@@ -452,7 +560,10 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
 ## 13. Settings (gear button)
 
 - **Your day:** usually up by (default 9am), usually asleep by (default 12am). This controls the folded hours and the planner's free time.
-- **Look:** day or night, as Automatic (8pm to 8am is night), Day, or Night.
+- **Look:**
+  - Theme: Notebook (default) or Sleek, plus any added from the second samples page.
+  - Day or night: Automatic (8pm to 8am is night), Day, or Night.
+- **Time log:** opens the log (section 10).
 - **Time zone:** Automatic (from this device) or a specific zone. Home default is America/Chicago.
 - **Planning:**
   - Schedule new tasks automatically (default off).
@@ -521,10 +632,22 @@ Full names: The Elements of Economic Analysis I Honors; Introduction to Proofs i
 
 ### Routines
 
-- Morning routine: daily at 9am, 30 minutes.
-- Meditate 10 min: daily, 10 minutes.
-- Gratitude, 5 things: daily, with a streak. About five sentences, so 5 minutes.
-- Night routine and journal: daily at 11pm, 45 minutes.
+- Morning routine: daily at 9am. Steps:
+  1. Brush teeth.
+  2. Shower.
+  3. Breakfast.
+  4. Get dressed.
+  5. Meditate (10 minutes).
+  6. Gratitude journal, 5 things (about five sentences, 5 minutes). It keeps its streak.
+
+  Meditate and gratitude used to be separate routines and become these steps. The block length is the total of the steps.
+- Night routine: daily at 11pm, 45 minutes. Steps:
+  1. Journal.
+  2. Brush teeth.
+  3. Change.
+  4. Read.
+  5. Put electronics away.
+- Supplements: daily, no set time. Steps are creatine and mystery powder.
 - Laundry: every Saturday. Steps with waiting time as in section 10: about 2h 20m start to finish, about 30m hands-on.
 - Clean the dorm: every other Saturday, starting October 3, 30 minutes.
 
@@ -542,10 +665,12 @@ Full names: The Elements of Economic Analysis I Honors; Introduction to Proofs i
   4. Shower mat.
 - **Clean the wooden container and store folders:** today or tomorrow.
 - **Consolidate the quant plan:** today or tomorrow.
-- **Waiting:**
-  - Gym and boxing club, once the cold is gone.
-  - ARCH reading, if accepted.
-  - Resume and internship applications, once the QNet certificate arrives.
+- **With conditions** (they stay in their windows, with tags):
+  - Gym and Check out boxing club: This week, if "Is the cold fully gone?"
+  - ARCH reading and photo upload: This week, if "Did you get into ARCH?"
+  - Update resume and apply to internships: Soon, if "Has the QNet certificate arrived?"
+  - Read The Muqaddimah: after Get The Muqaddimah.
+  - Prep for the reading response: after Read The Muqaddimah.
 - **Go through the Epiphany ML project and understand it:** This week, for the same "near future" reason, in 1-hour sessions.
 - **Decisions:** new blanket?, foam mattress topper?, skip econ discussion Friday?, build my own project based on Epiphany? (decide after going through it).
 - **Ongoing:** number theory book (45-minute sessions).
@@ -558,6 +683,8 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 ## 18. Open questions
 
 1. Phone week: one day per row, or a time grid you swipe sideways?
+5. Whether to add any themes from `design/theme-samples-2.html`.
+7. Whether 15 minutes is the right cutoff for "quick," and 30 minutes the right size for a batch.
 2. Which online host to use. Decided at the "go online" step.
 3. Whether to keep the left rail's mini month and Coming up list, or use that space differently.
 4. Whether Google Calendar should be read-only at first, or also receive planned blocks.
@@ -567,4 +694,12 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 9, 2026:** v0.6. Themes: Notebook and Sleek. Conditions use look C.
+- **Oct 9, 2026:** v0.5. Notes from using the app (step 13).
+  - Classes are never deadlines. Times are always 12-hour. Nothing lands in the past, and "today" after midnight means the coming day.
+  - The Sometime lane rule.
+  - Conditions ("if" and "after") are properties, and the Waiting group became the Check-ins strip.
+  - The add box makes changes and reports time, and understands plans for the day.
+  - The time log and better estimates.
+  - Routine steps, Quick things, themes, and hosting on a DigitalOcean droplet.
 - **Oct 2, 2026:** v0.4. How times and deadlines are stored. Waiting time inside a task (laundry). Routine lengths. Shopping run steps. Epiphany split into a task and a decision.

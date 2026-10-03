@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planner samples: themes and new looks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700&family=Share+Tech+Mono&family=Architects+Daughter&family=IBM+Plex+Mono:wght@400;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:system-ui, -apple-system, 'Segoe UI', sans-serif; background:#E7E6E1; color:#22252B; padding:28px 24px 60px; }
+.page { max-width:1500px; margin:0 auto; }
+.page > h1 { font-size:26px; font-weight:700; margin-bottom:4px; }
+.page > p { color:#5E636D; margin-bottom:22px; max-width:820px; line-height:1.5; }
+.page > h2 { font-size:19px; font-weight:700; margin:34px 0 4px; }
+.page > h2 + p { color:#5E636D; margin-bottom:14px; max-width:820px; line-height:1.5; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(350px, 1fr)); gap:18px; }
+.label { font-weight:700; font-size:14px; margin:0 0 6px 2px; }
+.label span { display:block; font-weight:400; color:#6B7080; font-size:13px; }
+
+/* ================= Theme variables ================= */
+[data-t] {
+  --font-h:'Caveat', cursive; --font-b:'Atkinson Hyperlegible', sans-serif; --h-size:32px; --h-weight:700; --tab-size:19px;
+  --r:5px 7px 6px 4px; --blk-r:3px 10px 4px 9px; --bw:1.5px; --shadow:none;
+  --pattern:none; --pattern-size:20px 20px; --fill:30%; --blk-edge:0px;
+}
+[data-t="notebook-day"] {
+  --bg:#EEECE4; --pattern:radial-gradient(#C9C3B2 1.1px, transparent 1.4px); --ink:#253047; --muted:#6B7180; --line:#D6D0C0;
+  --panel:#F7F5EF; --card:#FCFBF8; --frame:rgba(37,48,71,.55); --accent:#2F4F9E; --red:#C2413B; --hl:rgba(224,177,42,.45);
+  --c-class:#3D63C9; --c-errand:#E0B12A; --c-growth:#3F9A73; --c-life:#D46B95; --c-routine:#8A79C6;
+}
+[data-t="notebook-night"] {
+  --bg:#1B2130; --pattern:radial-gradient(#2D3545 1.1px, transparent 1.4px); --ink:#E4DFD1; --muted:#979DAB; --line:#323A4C;
+  --panel:#20273A; --card:#252D41; --frame:rgba(228,223,209,.42); --accent:#93B1F2; --red:#EF7F73; --hl:rgba(232,193,78,.32);
+  --c-class:#7E9CF0; --c-errand:#E8C14E; --c-growth:#6CC79E; --c-life:#EE93B6; --c-routine:#ADA0EC; --fill:26%;
+}
+[data-t="sleek-light"] {
+  --font-h:'Inter', sans-serif; --font-b:'Inter', sans-serif; --h-size:22px; --h-weight:700; --tab-size:13px;
+  --bg:#F4F5F7; --ink:#15171C; --muted:#6B7280; --line:#E6E8EC; --panel:#FFFFFF; --card:#FFFFFF; --frame:#E1E4E9;
+  --accent:#4F46E5; --red:#E5484D; --hl:rgba(79,70,229,.12); --r:10px; --blk-r:7px; --bw:1px; --shadow:0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.06);
+  --c-class:#4F7CFF; --c-errand:#F5A524; --c-growth:#12B76A; --c-life:#EE4689; --c-routine:#9353D3; --fill:13%; --blk-edge:3px;
+}
+[data-t="sleek-dark"] {
+  --font-h:'Inter', sans-serif; --font-b:'Inter', sans-serif; --h-size:22px; --h-weight:700; --tab-size:13px;
+  --bg:#0E1014; --ink:#E8EAED; --muted:#98A0AB; --line:#232832; --panel:#151920; --card:#1A1F28; --frame:#2A303B;
+  --accent:#8B8BFF; --red:#FF6369; --hl:rgba(139,139,255,.18); --r:10px; --blk-r:7px; --bw:1px; --shadow:0 1px 0 rgba(255,255,255,.03);
+  --c-class:#6E95FF; --c-errand:#F7B955; --c-growth:#32D583; --c-life:#F670A7; --c-routine:#B692F6; --fill:16%; --blk-edge:3px;
+}
+[data-t="neon"] {
+  --font-h:'Orbitron', sans-serif; --font-b:'Share Tech Mono', monospace; --h-size:19px; --h-weight:700; --tab-size:11.5px;
+  --bg:#07070F; --pattern:linear-gradient(rgba(0,240,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,240,255,.06) 1px, transparent 1px);
+  --ink:#E6F7FF; --muted:#7D8FB3; --line:rgba(0,240,255,.14); --panel:#0D0E1E; --card:#111329; --frame:#00E5F5;
+  --accent:#00F0FF; --red:#FF2A6D; --hl:rgba(255,42,109,.28); --r:0; --blk-r:0; --bw:1px; --shadow:0 0 10px rgba(0,229,245,.25);
+  --c-class:#00E5F5; --c-errand:#F9F871; --c-growth:#05FFA1; --c-life:#FF2A6D; --c-routine:#B967FF; --fill:18%; --blk-edge:2px;
+}
+[data-t="blueprint"] {
+  --font-h:'Architects Daughter', cursive; --font-b:'IBM Plex Mono', monospace; --h-size:26px; --h-weight:400; --tab-size:15px;
+  --bg:#0F3D72; --pattern:linear-gradient(rgba(255,255,255,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.09) 1px, transparent 1px);
+  --ink:#F1F6FF; --muted:#A9C1E6; --line:rgba(255,255,255,.22); --panel:rgba(255,255,255,.05); --card:rgba(255,255,255,.07); --frame:rgba(255,255,255,.8);
+  --accent:#FFD166; --red:#FF9A8F; --hl:rgba(255,209,102,.32); --r:2px; --blk-r:2px; --bw:1.2px;
+  --c-class:#9CC9FF; --c-errand:#FFD166; --c-growth:#8EF0C4; --c-life:#FFB1C8; --c-routine:#D2B8FF; --fill:24%;
+}
+[data-t="fog"] {
+  --font-h:'Nunito', sans-serif; --font-b:'Nunito', sans-serif; --h-size:23px; --h-weight:700; --tab-size:13.5px;
+  --bg:#E9E8F0; --ink:#3B3A4F; --muted:#86849C; --line:#DEDCE8; --panel:#F6F5FA; --card:#FFFFFF; --frame:transparent;
+  --accent:#6E71C4; --red:#D2557A; --hl:#E1E1F6; --r:16px; --blk-r:12px; --bw:1px; --shadow:0 2px 14px rgba(70,66,120,.08);
+  --c-class:#AAB1E8; --c-errand:#F0C0A3; --c-growth:#A6D0AF; --c-life:#E6B0CA; --c-routine:#C4B9E6; --fill:60%;
+}
+
+/* ================= Mini app ================= */
+.app { background-color:var(--bg); background-image:var(--pattern); background-size:var(--pattern-size); color:var(--ink); font-family:var(--font-b); font-size:13px; line-height:1.4; border-radius:12px; padding:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+.box { border:var(--bw) solid var(--frame); background:var(--panel); border-radius:var(--r); box-shadow:var(--shadow); }
+.head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.date { display:flex; align-items:baseline; gap:8px; }
+.date h3 { font-family:var(--font-h); font-size:var(--h-size); font-weight:var(--h-weight); line-height:1; white-space:nowrap; }
+.date span { color:var(--muted); font-family:var(--font-h); font-size:calc(var(--h-size) * .62); white-space:nowrap; }
+.tabs { display:flex; gap:4px; }
+.tab { font-family:var(--font-h); font-size:var(--tab-size); font-weight:600; height:28px; min-width:46px; padding:0 8px; display:grid; place-items:center; color:var(--muted); }
+.tab.on { background:var(--hl); color:var(--ink); }
+[data-t^="sleek"] .tab.on, [data-t="fog"] .tab.on { color:var(--accent); }
+.gear { width:28px; height:28px; display:grid; place-items:center; color:var(--ink); }
+.gear svg { width:15px; height:15px; }
+.rule { height:2px; background:var(--ink); opacity:.45; margin:9px 0 6px; border-radius:2px; }
+[data-t^="sleek"] .rule, [data-t="fog"] .rule { height:1px; opacity:.12; }
+.sub { font-family:var(--font-h); font-size:calc(var(--h-size) * .56); color:var(--ink); margin-bottom:10px; }
+.sub b { color:var(--muted); font-weight:inherit; }
+[data-t^="sleek"] .sub, [data-t="neon"] .sub, [data-t="fog"] .sub { font-family:var(--font-b); font-size:12.5px; }
+.sched { padding:10px 10px 12px; margin-bottom:10px; }
+.lane { display:flex; align-items:center; gap:6px; border:1.5px dashed var(--line); border-radius:6px; padding:4px 6px; margin-bottom:6px; font-size:12px; }
+.lane i { font-family:var(--font-h); font-style:normal; color:var(--muted); font-size:calc(var(--h-size) * .5); }
+.chip { border:1px solid var(--line); background:var(--card); border-radius:5px; padding:1px 7px; }
+.hours { position:relative; margin-left:40px; height:276px; margin-top:8px; }
+.hr { position:absolute; left:0; right:0; border-top:1px solid var(--line); }
+.hr span { position:absolute; left:-40px; top:-7px; width:34px; text-align:right; font-size:10.5px; color:var(--muted); }
+.now { position:absolute; left:-3px; right:0; border-top:2px solid var(--red); z-index:5; }
+.now::before { content:''; position:absolute; left:-3px; top:-5px; width:8px; height:8px; border-radius:50%; background:var(--red); }
+.b { position:absolute; left:3px; right:3px; padding:3px 7px 3px 8px; font-size:11.5px; line-height:1.25; overflow:hidden; border-radius:var(--blk-r);
+  background:color-mix(in srgb, var(--cat) var(--fill), var(--card)); border-left:var(--blk-edge) solid var(--cat); }
+.b b { display:flex; align-items:center; gap:4px; font-weight:700; white-space:nowrap; overflow:hidden; }
+.b small { display:block; color:var(--muted); font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.b.tent { background:color-mix(in srgb, var(--cat) 9%, var(--card)); border:1.5px dashed var(--cat); }
+.ic { width:11px; height:11px; flex:none; color:var(--muted); }
+[data-t="neon"] .date h3 { text-shadow:0 0 10px rgba(0,240,255,.6); color:#B9FBFF; }
+[data-t="neon"] .b { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--cat) 55%, transparent); }
+[data-t="neon"] .box { clip-path:polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+[data-t="blueprint"] .b { border:1px solid color-mix(in srgb, var(--cat) 70%, transparent); }
+
+/* Condition look A (default in theme cards): dotted border + tag */
+.cond-a { border:1.6px dotted var(--ink) !important; background:color-mix(in srgb, var(--cat) 10%, var(--card)) !important; }
+.tag { display:inline-flex; align-items:center; gap:3px; margin-top:2px; font-size:10.5px; padding:0 6px; border-radius:999px; border:1px dotted var(--ink); color:var(--ink); background:var(--card); white-space:nowrap; }
+
+.tasks { padding:10px 12px 12px; }
+.tasks h4 { font-family:var(--font-h); font-size:calc(var(--h-size) * .66); font-weight:600; margin:8px 0 5px; line-height:1.1; }
+[data-t^="sleek"] .tasks h4, [data-t="fog"] .tasks h4 { font-size:12px; text-transform:none; color:var(--muted); font-weight:600; margin-top:10px; }
+[data-t="neon"] .tasks h4 { font-size:11.5px; letter-spacing:.06em; color:var(--accent); }
+.checkin { display:flex; align-items:center; gap:6px; font-size:12px; padding:5px 8px; border-radius:6px; background:color-mix(in srgb, var(--accent) 10%, var(--card)); border:1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.checkin b { flex:1; }
+.pill { border:1px solid var(--line); background:var(--card); border-radius:999px; padding:1px 9px; font-size:11px; color:var(--ink); }
+.card { display:grid; grid-template-columns:14px 1fr auto; gap:8px; align-items:start; padding:7px 9px; margin-bottom:6px; border:1px solid var(--line); background:var(--card); border-radius:var(--r); }
+[data-t="notebook-day"] .card, [data-t="notebook-night"] .card { border-radius:6px; }
+.cb { width:14px; height:14px; border:1.5px solid var(--ink); border-radius:3px; opacity:.75; margin-top:1px; }
+[data-t^="sleek"] .cb, [data-t="fog"] .cb { border-radius:50%; border-color:var(--muted); }
+.card .t { font-weight:600; }
+.card .t i { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--cat); margin-right:6px; vertical-align:1px; }
+.card .m { color:var(--muted); font-size:11.5px; }
+.due { font-size:10.5px; padding:1px 7px; border-radius:999px; white-space:nowrap; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent); font-weight:700; }
+
+/* ================= Condition looks ================= */
+.cmp { display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:18px; }
+.variant .app { padding:12px; }
+.variant .hours { height:auto; }
+.vnote { font-size:13px; color:#4C515B; margin:8px 2px 0; line-height:1.45; }
+/* B: hollow rings + italic line */
+.ring { display:inline-block; width:8px; height:8px; border-radius:50%; border:1.6px solid var(--cat); margin-right:5px; vertical-align:0; }
+.ring + .ring { margin-left:-3px; }
+.cond-b-line { font-style:italic; color:var(--muted); font-size:11px; }
+/* C: hatched edge + fade + inline question */
+.cond-c { opacity:.72; background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--cat) 16%, var(--card)) 0 6px, color-mix(in srgb, var(--cat) 6%, var(--card)) 6px 12px) !important; border-left:3px dashed var(--cat) !important; }
+.ask { display:flex; gap:4px; align-items:center; margin-top:3px; font-size:10.5px; }
+.ask button { border:1px solid var(--ink); background:var(--card); color:var(--ink); border-radius:999px; padding:0 7px; font:inherit; }
+
+/* ================= Other new looks ================= */
+.wide-app { max-width:760px; }
+.qt { background:var(--card) !important; border:1.5px solid var(--frame) !important; }
+.qt ul { list-style:none; margin-top:3px; }
+.qt li { display:flex; align-items:center; gap:6px; font-size:11.5px; padding:1px 0; }
+.qt li .cb { width:11px; height:11px; margin:0; }
+.qt li.done span { text-decoration:line-through; color:var(--muted); }
+.qt li.done .cb { background:var(--ink); }
+.row { display:flex; align-items:center; gap:8px; padding:5px 2px; border-bottom:1px dashed var(--line); font-size:13px; }
+.row .grow { flex:1; }
+.row .r { color:var(--muted); font-size:11.5px; }
+.row.step { padding-left:24px; font-size:12.5px; }
+.row.step .cb { width:12px; height:12px; }
+.row.done .grow { text-decoration:line-through; color:var(--muted); }
+.row.done .cb { background:var(--ink); }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.logged { border-left:3px solid var(--cat) !important; }
+.trimmed small b { color:var(--red); font-weight:700; }
+.toast { margin-top:10px; background:var(--ink); color:var(--bg); padding:7px 12px; border-radius:14px; font-size:12px; display:flex; gap:10px; align-items:center; }
+.toast u { font-weight:700; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Samples: themes and new looks</h1>
+  <p>Static pictures for picking a direction, not working screens. Every theme shows the same Saturday: a Quick things batch, the MTG event, the go club with a condition, a penciled reading, and the gym with friends. <b>Chosen: Notebook (default) and Sleek, light and dark.</b> The layout and behavior stay the same in every theme. Only the paint changes.</p>
+
+  <h2>1. Themes</h2>
+  <p>Notebook stays the default. Each of the others would be one choice in Settings, under Look, then Theme. Sleek has a light and a dark version, so automatic day and night would switch between them. Neon and Blueprint are dark-only.</p>
+  <div class="grid" id="themes"></div>
+
+  <h2>2. Three looks for conditions ("if" and "after")</h2>
+  <p>The same go club block and reading card, three ways. <b>Chosen: C.</b> The theme samples above use it too.</p>
+  <div class="cmp" id="conds"></div>
+
+  <h2>3. Other new pieces</h2>
+  <p>A Quick things batch, routine steps in the Daily checklist, and what reporting "sosc reading done (82 minutes starting at 3:46pm)" would do to Friday.</p>
+  <div class="cmp" id="others"></div>
+</div>
+
+<script>
+const PIN = '<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10.8 2.4l2.8 2.8-7.9 7.9-3.5.7.7-3.5z"/></svg>';
+const GEAR = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg>';
+const H0 = 12 * 60, HH = 46;
+const y = m => (m - H0) / 60 * HH;
+const blk = (a, b, cat, inner, cls = '') => `<div class="b ${cls}" style="--cat:var(--c-${cat});top:${y(a) + 1}px;height:${y(b) - y(a) - 3}px">${inner}</div>`;
+const hours = (from, to) => { let h = ''; for (let m = from; m <= to; m += 60) { const hr = Math.floor(m / 60), lab = (hr % 12 || 12) + (hr < 12 ? 'am' : 'pm'); h += `<div class="hr" style="top:${y(m)}px"><span>${lab}</span></div>`; } return h; };
+
+function miniApp(theme) {
+  return `<div class="app" data-t="${theme}">
+    <div class="head">
+      <div class="date"><h3>Sat, Oct 10</h3><span>12:20pm</span></div>
+      <div class="tabs"><span class="box tab on">Day</span><span class="box tab">Week</span><span class="box tab">Month</span><span class="box gear">${GEAR}</span></div>
+    </div>
+    <div class="rule"></div>
+    <div class="sub"><b>Next deadline:</b> the Muqaddimah reading, Tuesday at 2pm.</div>
+    <div class="box sched">
+      <div class="lane"><i>Sometime today</i><span class="chip">Laundry</span></div>
+      <div class="hours">
+        ${hours(H0, 18 * 60)}
+        ${blk(750, 780, 'errand', `<b>Quick things, 25 min</b><small>Text Sam back, reply to RSO email, Venmo roommates</small>`)}
+        ${blk(795, 855, 'life', `<b>MTG event</b><small>Around 1:15pm, Crerar Library</small>`, 'tent')}
+        ${blk(855, 900, 'life', `<b>Go club</b><small>if it's open</small>`, 'cond-c')}
+        ${blk(905, 955, 'class', `<b>Read The Muqaddimah ${PIN}</b><small>3:05–3:55pm. Next: Chapter 2</small>`)}
+        ${blk(960, 1050, 'life', `<b>Gym with friends</b><small>Around 4pm, 90 min</small>`, 'tent')}
+        <div class="now" style="top:${y(740)}px"></div>
+      </div>
+    </div>
+    <div class="box tasks">
+      <div class="checkin"><b>Is the cold fully gone?</b><span class="pill">Yes</span><span class="pill">Not yet</span></div>
+      <h4>This week</h4>
+      <div class="card" style="--cat:var(--c-class)"><span class="cb"></span><div><div class="t"><i></i>Get The Muqaddimah</div><div class="m">About 20–40m</div></div><span></span></div>
+      <div class="card cond-c" style="--cat:var(--c-class)"><span class="cb"></span><div><div class="t"><i></i>Read The Muqaddimah</div><div class="m">after Get The Muqaddimah</div></div><span class="due">Due Tue 2pm</span></div>
+    </div>
+  </div>`;
+}
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+const THEMES = [
+  ['notebook-day', 'Notebook, day', 'the current default'],
+  ['notebook-night', 'Notebook, night', 'automatic from 8pm'],
+  ['sleek-light', 'Sleek, light', 'clean modern app, Inter font, colored left edges'],
+  ['sleek-dark', 'Sleek, dark', 'the same, for night'],
+  ['neon', 'Neon', 'cyberpunk: glowing cyan and pink on black, clipped corners'],
+  ['blueprint', 'Blueprint', 'white lines on blueprint blue, drafting-style handwriting'],
+  ['fog', 'Fog', 'soft pastels and rounded corners, from the very first samples'],
+];
+document.getElementById('themes').innerHTML = THEMES.map(([t, name, note]) => `<div><div class="label">${name}<span>${cap(note)}</span></div>${miniApp(t)}</div>`).join('');
+
+/* ---------- condition looks ---------- */
+const H1 = 13 * 60, HV = 60;
+const y2 = m => (m - H1) / 60 * HV;
+const blk2 = (a, b, cat, inner, cls = '') => `<div class="b ${cls}" style="--cat:var(--c-${cat});top:${y2(a) + 1}px;height:${y2(b) - y2(a) - 3}px">${inner}</div>`;
+const hours2 = () => { let h = ''; for (let m = H1; m <= 16 * 60; m += 60) { const hr = Math.floor(m / 60); h += `<div class="hr" style="top:${y2(m)}px"><span>${hr % 12 || 12}pm</span></div>`; } return h; };
+const VARIANTS = [
+  ['A', 'Dotted border plus a tag', 'The whole item is dotted, and a small dotted tag says the condition. It\'s the easiest to spot, and it works the same on cards and blocks.',
+    blk2(795, 855, 'life', `<b>MTG event</b><small>Around 1:15pm</small>`, 'tent') + blk2(855, 900, 'life', `<b>Go club</b><span class="tag">if it's open</span>`, 'cond-a') + blk2(910, 960, 'life', `<b>Something normal</b><small>3:10–4pm</small>`),
+    `<div class="card cond-a" style="--cat:var(--c-class)"><span class="cb"></span><div><div class="t"><i></i>Read The Muqaddimah</div><span class="tag">after Get The Muqaddimah</span></div><span class="due">Due Tue 2pm</span></div>`],
+  ['B', 'Hollow rings plus a quiet line', 'Normal border. The category dot turns into a hollow ring (two rings for "if"), and an italic line under the title says the condition. It\'s calmer and less noisy, but easier to miss.',
+    blk2(795, 855, 'life', `<b>MTG event</b><small>Around 1:15pm</small>`, 'tent') + blk2(855, 900, 'life', `<b><span class="ring"></span><span class="ring"></span>Go club</b><span class="cond-b-line">only if it's open</span>`) + blk2(910, 960, 'life', `<b>Something normal</b><small>3:10–4pm</small>`),
+    `<div class="card" style="--cat:var(--c-class)"><span class="cb"></span><div><div class="t"><span class="ring"></span>Read The Muqaddimah</div><div class="cond-b-line">after Get The Muqaddimah</div></div><span class="due">Due Tue 2pm</span></div>`],
+  ['C', 'Faded and striped until confirmed', 'The item looks penciled-in and unsure: faded, with stripes and a dashed edge. When its time comes, it asks right on the block. It\'s the most "not real yet" feeling, but also the busiest.',
+    blk2(795, 855, 'life', `<b>MTG event</b><small>Around 1:15pm</small>`, 'tent') + blk2(855, 905, 'life', `<b>Go club</b><small>if it's open</small><div class="ask">Still on? <button>Yes</button><button>No</button></div>`, 'cond-c') + blk2(915, 960, 'life', `<b>Something normal</b><small>3:15–4pm</small>`),
+    `<div class="card cond-c" style="--cat:var(--c-class)"><span class="cb"></span><div><div class="t"><i></i>Read The Muqaddimah</div><div class="m">after Get The Muqaddimah</div></div><span class="due">Due Tue 2pm</span></div>`],
+];
+document.getElementById('conds').innerHTML = VARIANTS.map(([k, name, note, blocks, card]) => `<div class="variant"><div class="label">${k}. ${name}</div>
+  <div class="app" data-t="notebook-day"><div class="box sched"><div class="hours" style="height:${y2(16 * 60)}px">${hours2()}${blocks}</div></div><div class="box tasks">${card}</div></div>
+  <p class="vnote">${note}</p></div>`).join('');
+
+/* ---------- other pieces ---------- */
+const H3 = 15 * 60;
+const y3 = m => (m - H3) / 60 * HH;
+const blk3 = (a, b, cat, inner, cls = '') => `<div class="b ${cls}" style="--cat:var(--c-${cat});top:${y3(a) + 1}px;height:${y3(b) - y3(a) - 3}px">${inner}</div>`;
+const hours3 = () => { let h = ''; for (let m = H3; m <= 18 * 60; m += 60) { const hr = Math.floor(m / 60); h += `<div class="hr" style="top:${y3(m)}px"><span>${hr % 12 || 12}pm</span></div>`; } return h; };
+document.getElementById('others').innerHTML = `
+  <div class="variant"><div class="label">Quick things<span>Short tasks batched into one block</span></div>
+    <div class="app" data-t="notebook-day"><div class="box sched"><div class="hours" style="height:150px">
+      <div class="hr" style="top:0"><span>12pm</span></div><div class="hr" style="top:80px"><span>12:30</span></div>
+      <div class="b qt" style="--cat:var(--c-errand);top:2px;height:140px"><b>Quick things, 25 min</b><ul>
+        <li class="done"><span class="cb"></span><span>Text Sam back</span></li>
+        <li><span class="cb"></span><span>Reply to the RSO email</span></li>
+        <li><span class="cb"></span><span>Venmo roommates for the shower mat</span></li>
+        <li><span class="cb"></span><span>Book a haircut</span></li></ul></div>
+    </div></div></div>
+    <p class="vnote">Anything estimated at 15 minutes or less can go here. The planner batches them, and you can drag one out or drop one in.</p></div>
+
+  <div class="variant"><div class="label">Routine steps<span>The Daily checklist with the morning routine open</span></div>
+    <div class="app" data-t="notebook-day"><div class="box tasks">
+      <h4>Daily</h4>
+      <div class="row"><span class="cb"></span><span class="grow"><b>Morning routine</b></span><span class="r">3 of 6, 9am</span></div>
+      <div class="row step done"><span class="cb"></span><span class="grow">Brush teeth</span></div>
+      <div class="row step done"><span class="cb"></span><span class="grow">Shower</span></div>
+      <div class="row step done"><span class="cb"></span><span class="grow">Breakfast</span></div>
+      <div class="row step"><span class="cb"></span><span class="grow">Get dressed</span></div>
+      <div class="row step"><span class="cb"></span><span class="grow">Meditate</span><span class="r">10m</span></div>
+      <div class="row step"><span class="cb"></span><span class="grow">Gratitude journal, 5 things</span><span class="r">5-day streak</span></div>
+      <div class="row"><span class="cb"></span><span class="grow">Supplements</span><span class="r">0 of 2</span></div>
+      <div class="row"><span class="cb"></span><span class="grow">Night routine</span><span class="r">0 of 5, 11pm</span></div>
+    </div></div>
+    <p class="vnote">Tap a routine to open its steps. Checking every step checks the routine, and the gratitude streak lives on its step.</p></div>
+
+  <div class="variant"><div class="label">Reporting what you did<span>Friday, after "sosc reading done (82 minutes starting at 3:46pm)"</span></div>
+    <div class="app" data-t="notebook-day"><div class="box sched"><div class="hours" style="height:${y3(18 * 60)}px">${hours3()}
+      ${blk3(900, 946, 'life', `<b>RSO fair</b><small>3–3:46pm, <b>ended early</b></small>`, 'trimmed')}
+      ${blk3(946, 1028, 'class', `<b>✓ Read The Muqaddimah</b><small>3:46–5:08pm, 82 min (estimated 75)</small>`, 'logged')}
+    </div></div>
+    <div class="toast">Marked “Read The Muqaddimah” done, 3:46–5:08pm (82 min). Ended RSO fair at 3:46pm. <u>Undo</u></div></div>
+    <p class="vnote">The block moves to when it actually happened, and the RSO fair is trimmed. The 82 minutes go into the time log, so the next reading estimate is closer.</p></div>
+`;
+</script>
+</body>
+</html>

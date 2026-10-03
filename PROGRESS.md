@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13.
+Step 13a.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -69,14 +69,71 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - The capacity warning.
   - The "how long did it take?" prompt.
 - [x] **12. Settings sheet** (spec §13), including automatic night mode and the time zone setting.
-- [ ] **13. Use it daily for a week.** Collect annoyances in the Backlog below, then fix the worst ones.
+- [x] **13. Use it daily for a week.** The first round of notes (Oct 9) became steps 13a–13g and spec v0.5.
+- [ ] **13a. Fixes from daily use.**
+  - **Classes are never deadlines** (spec §6 and §11). The header showed "ECON … due at 11:00am" at the class's start. Find where that came from (the data, the parser, or the deadline lines), fix it, and add a test.
+  - **12-hour times everywhere** (spec §4).
+    - Replace `<input type="time">` with our own 12-hour picker.
+    - The AI prompt says to write 12-hour times in titles and notes.
+    - Add a test that no rendered label contains a 24-hour time like "13:30".
+  - **Never in the past** (spec §10). This covers new items from the add box, the Plan button, and automatic scheduling.
+    - Between midnight and 4am, "today" means the calendar day that just started.
+    - Test: at 12:47am, "2:30pm today" lands at 2:30pm that afternoon, not the previous one.
+  - **The Sometime lane rule** (spec §7). Find out why items weren't showing up there. Then test each of the five sources: dragged in, "today" with no time, day-only deadlines due that day, rolled over, and events with no time.
+- [ ] **13b. Conditions: "if" and "after"** (spec §10).
+  - **Data:** a condition on any task or event. It's either a question (reusing the check-in questions) or another item.
+  - **Migration:** the existing waiting tasks keep their questions and get windows, per spec §16. Add Read The Muqaddimah after Get The Muqaddimah, and Prep for the reading response after Read The Muqaddimah.
+  - **Display:**
+    - Remove the Waiting group and add the Check-ins strip at the top of the task panel.
+    - Look C from `design/theme-samples.html` on cards and blocks: faded, striped, dashed left edge, and the condition in small text.
+    - A timed "if" block asks "Still on? Yes / No" when its time comes, and so does its popover.
+  - **Planner:** never plans an "if" item until it's answered Yes, and never places an "after" item before its prerequisite.
+  - **Test:** the planner can't place Read before Get.
+- [ ] **13c. Routine steps and Quick things** (spec §10 and §16).
+  - **Routine steps in the Daily checklist:** open a routine to see its steps, check them off per day, see progress ("3 of 6"), and keep a streak on a step.
+  - **Migration:**
+    - Meditate and Gratitude become steps of the morning routine. Keep gratitude's streak history on its step.
+    - Add the night routine's steps.
+    - Add the Supplements routine.
+  - **Quick things:** a `quick` flag (15 minutes or less). The planner batches quick tasks into one "Quick things" block, and a short task dropped onto that block joins the batch.
+- [ ] **13d. Actual time and the time log** (spec §10).
+  - Sessions with a start and an end.
+  - Start and Stop on blocks and cards.
+  - Logged blocks at the time they actually happened, and trimming a past event they overlap.
+  - The time log, opened from Done and from Settings, with the estimate next to the actual time. Entries can be edited.
+  - Edited estimates are remembered.
+- [ ] **13e. The add box makes changes and plans days** (spec §11).
+  - **What the AI gets:** current tasks, routines, today's and tomorrow's schedule, and recent actual times.
+  - **Change actions:** done, delete, update, move, check a step, and log time. When it's unclear which item is meant, ask with buttons and change nothing.
+  - **Day plans:** soft times ("around," "preferably before," "asap") and order ("after"), with conditions.
+  - **Also:** offering to answer an implied check-in, and leaner estimates.
+  - **Tests:** add `tests/fixtures/notes-oct-9.txt` with the user's exact lines:
+    - "sosc reading done (82 minutes starting at 3:46pm)"
+    - "go to mtg event at crear library preferably before 1:30pm, head to go club after asap and stop by if its open, meet with friends at around 4 to go to gym for 90 minutes"
+
+    Test the mapping using recorded AI replies, with no network in tests. Then the user checks it once with the real API.
+- [ ] **13f. Canvas calendar feed** (spec §14). This moved up from step 17, since it works on localhost.
+  - The server fetches the saved feed link on start and every few hours.
+  - Assignments become tasks with deadlines in Classes, matched to courses by code and marked "From Canvas."
+  - Fetching again updates instead of duplicating, and never overwrites something the user changed.
+  - Test with a saved sample feed.
+- [ ] **13g. Themes** (spec §4). Add a Theme setting with Notebook and Sleek (light and dark), matching `design/theme-samples.html`. Move every color, font, corner shape, and background pattern into theme variables, so adding another theme later is only a new set of values. Day and night keep switching automatically within Sleek. Then add any themes the user picked from `design/theme-samples-2.html`.
 
 ## Part 2: online
 
-- [ ] **14. Go online.** Pick a host, move the database, add a sign-in for one user, and make the app installable on the phone home screen.
+- [ ] **14. Go online on a DigitalOcean droplet** (spec §3).
+  - First, write `DEPLOY.md` with the exact steps the user does by hand: create the droplet, get a domain and point it at the droplet, and put `.env` on the server.
+  - Then set up:
+    - HTTPS with Caddy, which gets certificates automatically.
+    - The app as a systemd service that restarts on its own.
+    - A deploy script, so updating is one command.
+    - A nightly SQLite backup copied off the droplet.
+    - A sign-in for one person.
+  - Make the app installable on the phone's home screen (manifest, icons, service worker).
+  - Remove the `server.host` workaround from the Backlog.
 - [ ] **15. Notifications** (spec §13 list) through web push.
 - [ ] **16. Google Calendar** (spec §14): sign-in and reading events first, then optional write-back.
-- [ ] **17. Canvas calendar feed** (spec §14).
+- [x] **17. Canvas calendar feed.** Moved to 13f.
 
 ## Backlog
 Ideas and annoyances from using the app. Add them here. Don't fix them in the middle of another step.
