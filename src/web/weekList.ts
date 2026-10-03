@@ -33,8 +33,10 @@ export function weekRows(day: DaySchedule): WeekRow[] {
     if (x.type === 'class') {
       out.push({ ...base, text: classTitle(x), look: x.skipped ? 'skipped' : 'class', categoryId: x.categoryId ?? 'class', done: false });
     } else if (x.type === 'block' && x.kind !== 'open') {
-      const text = x.kind === 'task' ? x.title ?? 'Task' : `${x.title ?? 'Event'}${x.tentative ? ' (roughly)' : ''}`;
-      out.push({ ...base, text, look: x.kind === 'task' ? 'task' : 'event', categoryId: x.categoryId, done: x.done });
+      const text = x.kind === 'quick'
+        ? `Quick things: ${x.items.map((i) => i.title).join(', ')}`
+        : x.kind === 'task' ? x.title ?? 'Task' : `${x.title ?? 'Event'}${x.tentative ? ' (roughly)' : ''}`;
+      out.push({ ...base, text, look: x.kind === 'task' || x.kind === 'quick' ? 'task' : 'event', categoryId: x.categoryId, done: x.done });
     }
   }
   // A day-only deadline is already listed as due.

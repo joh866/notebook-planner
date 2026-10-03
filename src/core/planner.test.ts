@@ -47,11 +47,11 @@ describe('free time', () => {
     });
     const blk = (id: string, kind: BlockItem['kind'], a: number, b: number): BlockItem => ({
       ...base, type: 'block', id, kind, title: id, taskId: null, startMin: a, endMin: b, durationMinutes: b - a, tentative: false, label: null,
-      location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null, condition: null, askNow: false,
+      location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null, condition: null, askNow: false, items: [],
     });
     const laundry: RoutineItem = {
       ...base, type: 'routine', id: 'l', slotId: 'l', routineId: 'l', title: 'Laundry', start: '10:00', durationMinutes: 140, changed: false,
-      checked: false, startMin: 600, endMin: 740, steps: LAUNDRY.map((s, i) => ({ ...s, id: String(i), checked: false })),
+      checked: false, startMin: 600, endMin: 740, steps: LAUNDRY.map((s, i) => ({ ...s, id: String(i), checked: false, streak: null })),
     };
     expect(busyOf([cls('a', 660, 740), cls('b', 800, 860, true), blk('o', 'open', 900, 960), blk('e', 'event', 960, 1020), blk('p', 'task', 1100, 1160), laundry], new Set(['p'])))
       .toEqual([[600, 610], [660, 740], [665, 670], [725, 740], [960, 1020]]);
@@ -233,5 +233,35 @@ describe('conditions (spec §10)', () => {
     const r = placed.find((p) => p.taskId === 'read')!;
     expect([g.date, r.date]).toEqual(['2026-10-02', '2026-10-02']);
     expect(r.startMin).toBeGreaterThanOrEqual(g.startMin + g.minutes);
+  });
+});
+
+describe('Quick things (spec §10)', () => {
+  const q = (id: string, est: number, more: Partial<PlanTask> = {}) => task(id, { window: 'near', estLow: est, estHigh: est, quick: true, ...more });
+
+  it('batches quick tasks into blocks of about 30 minutes, placed where the best one would go', () => {
+    const placed = planDay(day('2026-10-03', 9 * 60, 24 * 60), [q('a', 10), q('b', 10), q('c', 10), q('d', 10), task('big', { window: 'near', estLow: 60 })], clock);
+    expect(placed.map((p) => [p.batch ?? p.taskId, p.minutes, p.reason])).toEqual([
+      [['a', 'b', 'c'], 30, 'Quick things'],
+      [['d'], 10, 'Quick things'],
+      ['big', 60, 'Today or tomorrow'],
+    ]);
+    expect(placed[0]!.startMin).toBe(9 * 60);
+  });
+
+  it('keeps "after" items and resized blocks out of batches', () => {
+    const placed = planDay(day('2026-10-03', 9 * 60, 24 * 60), [q('a', 10), q('b', 10, { after: { taskId: null, ends: { date: '2026-10-02', min: 0 } } })], clock);
+    expect(placed.map((p) => p.batch ?? p.taskId)).toEqual([['a'], 'b']);
+  });
+
+  it('automatic scheduling adds a quick task to a batch with room, or starts one', () => {
+    const d = day('2026-10-02', 15 * 60 + 10, 24 * 60, [[16 * 60, 16 * 60 + 15]]);
+    d.batches = [{ blockId: 'qb', startMin: 16 * 60, minutes: 15 }];
+    const placed = placeNew([q('a', 10), q('b', 10), q('c', 10)], clock, () => d);
+    expect(placed.map((p) => [p.taskId, p.joinBlockId ?? null, p.batch ?? null, p.startMin])).toEqual([
+      ['a', 'qb', null, 960],
+      ['b', null, ['b'], 15 * 60 + 15],
+      ['c', 'new:b', null, 15 * 60 + 15],
+    ]);
   });
 });

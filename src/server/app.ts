@@ -102,6 +102,14 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
       const input = rolloverInputs(db, now(), zone);
       const result = rollover(input.today, input.zone, input.tasks, input.taskBlocks, input.sometime);
       for (const id of result.removeBlockIds) {
+        // "blockId:taskId" is a task in a "Quick things" block: it leaves the batch, which stays for what's done.
+        const [blockId, taskId] = id.split(':');
+        if (taskId) {
+          const key = { blockId, taskId };
+          change.before('quickItems', findRows(tx, 'quickItems', whereKey('quickItems', key)));
+          tx.delete(t.quickItems).where(whereKey('quickItems', key)).run();
+          continue;
+        }
         change.before('blocks', findRows(tx, 'blocks', whereKey('blocks', { id })));
         tx.delete(t.blocks).where(whereKey('blocks', { id })).run();
       }

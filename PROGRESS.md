@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13c.
+Step 13d.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -89,7 +89,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
     - A timed "if" block asks "Still on? Yes / No" when its time comes, and so does its popover.
   - **Planner:** never plans an "if" item until it's answered Yes, and never places an "after" item before its prerequisite.
   - **Test:** the planner can't place Read before Get.
-- [ ] **13c. Routine steps and Quick things** (spec §10 and §16).
+- [x] **13c. Routine steps and Quick things** (spec §10 and §16).
   - **Routine steps in the Daily checklist:** open a routine to see its steps, check them off per day, see progress ("3 of 6"), and keep a streak on a step.
   - **Migration:**
     - Meditate and Gratitude become steps of the morning routine. Keep gratitude's streak history on its step.
@@ -177,4 +177,15 @@ Agents add short notes here when a step is done.
     - `drops.test`: Gym (an "if" item) can be dropped on the schedule now.
     - `plan.test`: "pencils tasks into today's free time" no longer places Read before Get (Get and the Shopping run fill the end of the day). "Re-plans the same way" now resizes Problem Set 1, and the room it frees goes to Read, after Get.
   - New tests: the planner can't place Read before Get (`planner.test`), `server/conditions.test.ts`, and a v0.5 migration test with data like the real database's.
+- Step 13c:
+  - **Data.** Migration `0005` adds `routine_steps.show_streak`, `tasks.quick`, and the `quick_items` table (block, task, order), plus block kind `quick`. `0006_seed_v0_5_routines.sql` is guarded like `0002`. Meditate and Gratitude become morning steps 5 and 6, keeping their lengths and streak flag, and their check history moves to the steps (so the real database's Oct 2 checks carried over). Their routines are deleted. Steps 1–4 are added. The night routine is renamed "Night routine" and gets five steps. Supplements (5 min, two steps) goes right after it. Routine sort orders keep the gaps, so a migrated database matches a fresh seed.
+  - **Routine steps.** Checking a routine checks all its steps, and unchecking clears them. Checking every step checks the routine, and unchecking one unchecks it. Each is one Undo (a `then` hook on the per-day toggles in `resources.ts`). Steps carry `streak` when `showStreak` is set. In the Daily checklist, a routine with steps opens to show them, with "3 of 6". The routine's length stays as set: morning's 30 minutes is longer than its two timed steps.
+  - **Quick things.** `isQuick` (marked quick, or estimated at 15 minutes or less; never sittings or sessions) and `quickLength` (the low estimate, or 10, at most 15) are in `core/length.ts`. `planDay` batches quick tasks in score order, about 30 minutes each, placed where the best one would go. A batch counts as one of the 6, gives "Quick things" as the reason, and keeps "after" items and resized blocks out. Automatic scheduling (`placeNew`) adds a quick task to a quick block with room that can grow, or starts a new one that later tasks in the same run can join (`new:<taskId>`). The server writes a `quick` block titled "Quick things" plus `quick_items`. The Plan button lifts penciled quick blocks with something unfinished. A batched task counts as scheduled, and its card says when.
+  - **Drops.** `joinBatch` (a quick task dropped on the block; it grows to about 30 minutes) and `leaveBatch` (dragged out to the list). Placing a task on its own, or committing it to the lane, takes it out of its batch. An emptied batch is removed. Rollover takes an unfinished task out of a past batch, using "blockId:taskId" ids, and moves it to the Sometime lane. The block lists its tasks with their own checkboxes, and each one drags out. Other items dropped on the block go on the schedule there. The add box reads `quick`.
+  - **Tests rewritten for spec v0.5** (Meditate and Gratitude became steps, and Supplements was added):
+    - `seed.test`: the routine count is 5, and the meditate and gratitude lengths are now on their steps.
+    - `migrate-v0.4.test` "leaves alone anything the user created": the user's gratitude length is now on its step, and the laundry steps are counted alone.
+    - In `app.test`: the Daily lists (Friday and Saturday); "checks a routine off with a streak" now checks the gratitude step; "puts a routine on the schedule with a new time" and "marks a routine skipped" use Supplements.
+    - `drops.test`: "puts a checklist routine on the schedule" uses Supplements.
+  - New tests: step propagation (`app.test`), the routine migration (`migrate-v0.4.test`), `core/length.test.ts`, Quick things in `planner.test`, `server/quick.test.ts`, the batch drop rules (`drag.test`), and a quick block in `labels.test`.
 

@@ -33,23 +33,37 @@ const classes: (typeof t.classes.$inferInsert)[] = [
 ];
 
 const routines: (typeof t.routines.$inferInsert)[] = [
+  // Sort orders have gaps where Meditate and Gratitude were (spec v0.5 made them morning steps), so a
+  // migrated database and a fresh one match.
   { id: 'morning', title: 'Morning routine', categoryId: 'routine', durationMinutes: 30, repeat: 'daily', sortOrder: 0 },
-  { id: 'meditate', title: 'Meditate 10 min', categoryId: 'routine', durationMinutes: 10, repeat: 'daily', sortOrder: 1 },
-  { id: 'gratitude', title: 'Gratitude, 5 things', categoryId: 'routine', durationMinutes: 5, repeat: 'daily', showStreak: true, sortOrder: 2 },
-  { id: 'night', title: 'Night routine and journal', categoryId: 'routine', durationMinutes: 45, repeat: 'daily', sortOrder: 3 },
-  { id: 'laundry', title: 'Laundry', categoryId: 'routine', durationMinutes: 140, repeat: 'weekly', repeatDays: [SAT], sortOrder: 4 },
+  { id: 'night', title: 'Night routine', categoryId: 'routine', durationMinutes: 45, repeat: 'daily', sortOrder: 3 },
+  { id: 'supplements', title: 'Supplements', categoryId: 'routine', durationMinutes: 5, repeat: 'daily', sortOrder: 4 },
+  { id: 'laundry', title: 'Laundry', categoryId: 'routine', durationMinutes: 140, repeat: 'weekly', repeatDays: [SAT], sortOrder: 5 },
   { id: 'dorm', title: 'Clean the dorm', categoryId: 'routine', durationMinutes: 30, repeat: 'weekly', repeatDays: [SAT],
-    repeatEvery: 2, repeatFrom: '2026-10-03', sortOrder: 5 },
+    repeatEvery: 2, repeatFrom: '2026-10-03', sortOrder: 6 },
 ];
 
-/** Laundry's steps with waiting time (spec §10). They add up to its 140 minutes. */
+type StepSeed = Omit<typeof t.routineSteps.$inferInsert, 'id' | 'routineId'>;
+const stepsOf = (routineId: string, steps: StepSeed[]) =>
+  steps.map((step, i) => ({ id: `${routineId}-step-${i + 1}`, routineId, sortOrder: i, ...step }));
+
 const routineSteps: (typeof t.routineSteps.$inferInsert)[] = [
-  { title: 'Load the washer', minutes: 10 },
-  { title: 'Washing', minutes: 55, waiting: true },
-  { title: 'Move to the dryer', minutes: 5 },
-  { title: 'Drying', minutes: 55, waiting: true },
-  { title: 'Fold and put away', minutes: 15 },
-].map((step, i) => ({ id: `laundry-step-${i + 1}`, routineId: 'laundry', sortOrder: i, ...step }));
+  // Spec §16. Gratitude keeps its streak on its step.
+  ...stepsOf('morning', [
+    { title: 'Brush teeth' }, { title: 'Shower' }, { title: 'Breakfast' }, { title: 'Get dressed' },
+    { title: 'Meditate', minutes: 10 }, { title: 'Gratitude journal, 5 things', minutes: 5, showStreak: true },
+  ]),
+  ...stepsOf('night', [{ title: 'Journal' }, { title: 'Brush teeth' }, { title: 'Change' }, { title: 'Read' }, { title: 'Put electronics away' }]),
+  ...stepsOf('supplements', [{ title: 'Creatine' }, { title: 'Mystery powder' }]),
+  // Laundry's steps with waiting time (spec §10). They add up to its 140 minutes.
+  ...stepsOf('laundry', [
+    { title: 'Load the washer', minutes: 10 },
+    { title: 'Washing', minutes: 55, waiting: true },
+    { title: 'Move to the dryer', minutes: 5 },
+    { title: 'Drying', minutes: 55, waiting: true },
+    { title: 'Fold and put away', minutes: 15 },
+  ]),
+];
 
 const routineSlots: (typeof t.routineSlots.$inferInsert)[] = [
   { id: 'morning-slot', routineId: 'morning', start: '09:00', durationMinutes: 30 },

@@ -126,6 +126,9 @@ export const api = {
 
   setRoutineChecked: (routineId: string, date: string, checked: boolean) =>
     send<Changed>(checked ? 'PUT' : 'DELETE', `/api/routine-checks/${routineId}/${date}`),
+  /** One routine step on one day. Checking every step checks the routine (spec §10). */
+  setRoutineStepChecked: (stepId: string, date: string, checked: boolean) =>
+    send<Changed>(checked ? 'PUT' : 'DELETE', `/api/routine-step-checks/${stepId}/${date}`),
   skipSlot: (slotId: string, date: string) => send<Changed>('PUT', `/api/slot-exceptions/${slotId}/${date}`, { skipped: true }),
   deleteSlot: (slotId: string) => send<Changed>('DELETE', `/api/routine-slots/${slotId}`),
   deleteRoutine: (id: string) => send<Changed>('DELETE', `/api/routines/${id}`),

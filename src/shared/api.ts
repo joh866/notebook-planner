@@ -109,6 +109,7 @@ const TaskFields = z.strictObject({
   decisionYes: DecisionYesSchema.nullish(),
   doneAt: InstantSchema.nullish(),
   durationFeedback: DurationFeedbackSchema.nullish(),
+  quick: z.boolean().optional(),
   sortOrder: z.int().optional(),
 });
 export const TaskInputSchema = TaskFields.extend({ steps: z.array(StepInputSchema).optional() }).superRefine(rule(taskProblem));
@@ -118,6 +119,7 @@ const RoutineStepFields = z.strictObject({
   title: Title,
   minutes: Minutes.nullish(),
   waiting: z.boolean().optional(),
+  showStreak: z.boolean().optional(),
   sortOrder: z.int().optional(),
 });
 export const RoutineStepInputSchema = RoutineStepFields;
@@ -226,6 +228,10 @@ export const DropInputSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('resizeBlock'), blockId: Id, minutes: Minutes }),
   /** A routine block's new length, for this day only or every day. */
   z.strictObject({ action: z.literal('resizeRoutine'), slotId: Id, date: DaySchema, minutes: Minutes, everyDay: z.boolean().optional() }),
+  /** A quick task onto a "Quick things" block: it joins the batch (spec §10). */
+  z.strictObject({ action: z.literal('joinBatch'), taskId: Id, blockId: Id }),
+  /** A task dragged out of a "Quick things" block back to the list. */
+  z.strictObject({ action: z.literal('leaveBatch'), taskId: Id, blockId: Id }),
 ]);
 export type DropInput = z.infer<typeof DropInputSchema>;
 
@@ -340,6 +346,8 @@ export interface TaskCard {
   estHigh: number | null;
   sittingMinutes: number | null;
   sessionMinutes: number | null;
+  /** 15 minutes or less, or marked quick: it can go in a "Quick things" block (spec §10). */
+  quick: boolean;
   conditionId: string | null;
   /** Its "if" or "after" condition while it holds, shown in look C (spec §10, "Conditions"). */
   condition: ConditionView | null;
@@ -401,6 +409,8 @@ export interface RoutineStepView {
   minutes: number | null;
   waiting: boolean;
   checked: boolean;
+  /** Days in a row, for a step with a streak (gratitude). */
+  streak: number | null;
 }
 
 export interface RoutineItem extends Placed {
@@ -444,6 +454,17 @@ export interface BlockItem extends Placed {
   /** Task blocks only. */
   steps: StepView[];
   nextStep: string | null;
+  /** The tasks in a "Quick things" block (spec §10). Empty for other blocks. */
+  items: QuickItemView[];
+}
+
+export interface QuickItemView {
+  taskId: string;
+  title: string;
+  categoryId: string | null;
+  done: boolean;
+  /** How long it takes inside the batch. */
+  minutes: number;
 }
 
 export type ScheduleItem = ClassItem | RoutineItem | BlockItem;

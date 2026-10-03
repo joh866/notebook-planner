@@ -26,6 +26,7 @@ const TABLES = {
   classes: { table: t.classes, key: ['id'] },
   classSkips: { table: t.classSkips, key: ['classId', 'date'] },
   blocks: { table: t.blocks, key: ['id'] },
+  quickItems: { table: t.quickItems, key: ['blockId', 'taskId'] },
   sometime: { table: t.sometime, key: ['taskId'] },
   settings: { table: t.settings, key: ['id'] },
 } satisfies Record<string, { table: SQLiteTable; key: string[] }>;
@@ -48,6 +49,8 @@ const REFS: { child: TableName; column: string; parent: TableName; cascade: bool
   { child: 'taskSteps', column: 'taskId', parent: 'tasks', cascade: true },
   { child: 'blocks', column: 'taskId', parent: 'tasks', cascade: true },
   { child: 'sometime', column: 'taskId', parent: 'tasks', cascade: true },
+  { child: 'quickItems', column: 'taskId', parent: 'tasks', cascade: true },
+  { child: 'quickItems', column: 'blockId', parent: 'blocks', cascade: true },
   { child: 'routineChecks', column: 'routineId', parent: 'routines', cascade: true },
   { child: 'routineSteps', column: 'routineId', parent: 'routines', cascade: true },
   { child: 'routineSlots', column: 'routineId', parent: 'routines', cascade: true },

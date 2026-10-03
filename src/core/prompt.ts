@@ -50,6 +50,7 @@ Fields:
 - date (tasks): today's date, when a task is for today but has no time and no deadline ("call mom today"). It goes on today's list.
 - short: a 2-4 word name for a deadline that says what the work is ("Math PSet 2"), never a class's name.
 - est: [low, high] minutes, an honest range. Readings and problem sets get wide ranges.
+- quick (tasks): true for anything of about 15 minutes or less: a text, an email, a quick reply, a tiny chore.
 - sitting: minutes for one work session when the task is big.
 - session: minutes per session for ongoing skill items.
 - steps: the parts of a task, when it clearly has separate parts. Each is a string, or {"title":"...","minutes":N,"waiting":true} when the length is known. "waiting" means the step mostly runs by itself (a wash cycle, an oven timer); leave it out for hands-on steps.

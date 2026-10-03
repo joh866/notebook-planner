@@ -127,14 +127,15 @@ describe('POST /api/drops', () => {
   });
 
   it('puts a checklist routine on the schedule every day it repeats', async () => {
-    const r = await dropIt({ action: 'placeRoutine', routineId: 'meditate', date: SAT, startMin: 600 });
-    expect(r.body.item).toEqual({ routine: { title: 'Meditate 10 min', repeat: 'daily', repeatDays: null, repeatEvery: 1, start: '10:00' } });
+    // Supplements is the checklist routine with no time since spec v0.5 (meditate became a morning step).
+    const r = await dropIt({ action: 'placeRoutine', routineId: 'supplements', date: SAT, startMin: 600 });
+    expect(r.body.item).toEqual({ routine: { title: 'Supplements', repeat: 'daily', repeatDays: null, repeatEvery: 1, start: '10:00' } });
     for (const d of [FRI, SAT, '2026-10-04']) {
-      expect(routines(await day(d)).find((x) => x.routineId === 'meditate')).toMatchObject({ startMin: 600, endMin: 610 });
+      expect(routines(await day(d)).find((x) => x.routineId === 'supplements')).toMatchObject({ startMin: 600, endMin: 605 });
     }
-    expect((await day(SAT)).daily.find((x) => x.routineId === 'meditate')?.time).toBe('10:00');
+    expect((await day(SAT)).daily.find((x) => x.routineId === 'supplements')?.time).toBe('10:00');
     await undo(r.body.undo);
-    expect(routines(await day(SAT)).some((x) => x.routineId === 'meditate')).toBe(false);
+    expect(routines(await day(SAT)).some((x) => x.routineId === 'supplements')).toBe(false);
   });
 
   it('a weekly routine lands on its own days only', async () => {

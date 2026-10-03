@@ -2,7 +2,7 @@ import { DateTime } from 'luxon';
 import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
 import { deadlineName } from '../core/classes';
-import { blockLength } from '../core/length';
+import { blockLength, isQuick, quickLength } from '../core/length';
 import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask, type Prereq } from '../core/planner';
 import { classesOn, routineOccursOn, slotOn } from '../core/recurrence';
 import { streak } from '../core/streak';
@@ -13,6 +13,7 @@ import type {
   BlockItem,
   CheckInView,
   ClassItem,
+  QuickItemView,
   ConditionView,
   DailyRow,
   DaySchedule,
@@ -53,6 +54,7 @@ function load(db: Db) {
     classSkips: db.select().from(t.classSkips).all(),
     blocks: db.select().from(t.blocks).all(),
     sometime: db.select().from(t.sometime).all(),
+    quickItems: db.select().from(t.quickItems).orderBy(t.quickItems.sortOrder).all(),
   };
 }
 type Data = ReturnType<typeof load>;
@@ -92,12 +94,17 @@ function stepsOf(ctx: Ctx, taskId: string): StepView[] {
 }
 
 function routineStepsOn(ctx: Ctx, routineId: string, date: string): RoutineStepView[] {
+  const r = ctx.data.routines.find((x) => x.id === routineId);
   return ctx.data.routineSteps
     .filter((s) => s.routineId === routineId)
-    .map((s) => ({
-      id: s.id, title: s.title, minutes: s.minutes, waiting: s.waiting,
-      checked: ctx.data.routineStepChecks.some((c) => c.stepId === s.id && c.date === date),
-    }));
+    .map((s) => {
+      const days = new Set(ctx.data.routineStepChecks.filter((c) => c.stepId === s.id).map((c) => c.date));
+      return {
+        id: s.id, title: s.title, minutes: s.minutes, waiting: s.waiting, checked: days.has(date),
+        // A streak can belong to a step, like gratitude (spec §9).
+        streak: s.showStreak && r ? streak(r, days, date) : null,
+      };
+    });
 }
 
 const routineChecked = (ctx: Ctx, routineId: string, date: string) =>
@@ -164,20 +171,44 @@ function conditionOf(ctx: Ctx, c: Conditioned): ConditionView | null {
   return { kind: 'after', taskId: pre.task?.id ?? null, blockId: pre.block?.id ?? null, title, text: `after ${title}` };
 }
 
+/**
+ * Where each task is on the schedule: its own blocks, and its place in a "Quick things" block, with
+ * the minutes it takes there.
+ */
+function taskSlots(ctx: Ctx) {
+  const out: { blockId: string; taskId: string; startAt: string; minutes: number; batched: boolean }[] = [];
+  for (const b of ctx.data.blocks) if (b.taskId) out.push({ blockId: b.id, taskId: b.taskId, startAt: b.startAt, minutes: b.durationMinutes, batched: false });
+  for (const q of ctx.data.quickItems) {
+    const b = ctx.data.blocks.find((x) => x.id === q.blockId);
+    const task = ctx.data.tasks.find((x) => x.id === q.taskId);
+    if (b && task) out.push({ blockId: b.id, taskId: task.id, startAt: b.startAt, minutes: quickLength(task), batched: true });
+  }
+  return out;
+}
+
+/** The tasks in a "Quick things" block, in order. */
+function quickItemsOf(ctx: Ctx, blockId: string): QuickItemView[] {
+  return ctx.data.quickItems.filter((q) => q.blockId === blockId).flatMap((q) => {
+    const task = ctx.data.tasks.find((x) => x.id === q.taskId);
+    return task ? [{ taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, minutes: quickLength(task) }] : [];
+  });
+}
+
 function blockItem(ctx: Ctx, b: Rows<typeof t.blocks>[number], date: string): BlockItem {
   const task = b.taskId ? ctx.data.tasks.find((x) => x.id === b.taskId) : undefined;
   const steps = task ? stepsOf(ctx, task.id) : [];
   const start = utc(b.startAt);
   const startMin = minutesOnDay(start, date, ctx.zone);
-  const done = task ? !!task.doneAt : b.done;
+  const items = b.kind === 'quick' ? quickItemsOf(ctx, b.id) : [];
+  const done = task ? !!task.doneAt : b.kind === 'quick' ? items.length > 0 && items.every((x) => x.done) : b.done;
   const ended = start.plus({ minutes: b.durationMinutes }) <= ctx.now;
   const condition = conditionOf(ctx, task ?? b);
   return {
     type: 'block', id: b.id, kind: b.kind, title: task?.title ?? b.title, categoryId: b.categoryId ?? task?.categoryId ?? null,
     taskId: b.taskId, startAt: b.startAt, startMin, endMin: startMin + b.durationMinutes, durationMinutes: b.durationMinutes,
     tentative: b.tentative, label: b.label, location: b.location, pinned: b.pinned, reason: b.reason, rolledFrom: b.rolledFrom,
-    done, missed: b.kind === 'task' && !done && ended && date === ctx.today,
-    steps, nextStep: steps.find((s) => !s.done)?.title ?? null,
+    done, missed: (b.kind === 'task' || b.kind === 'quick') && !done && ended && date === ctx.today,
+    steps, nextStep: steps.find((s) => !s.done)?.title ?? null, items,
     condition, askNow: condition?.kind === 'if' && !done && start <= ctx.now,
   };
 }
@@ -202,7 +233,7 @@ function deadlinesOn(ctx: Ctx, date: string): DeadlineView[] {
  * deadlines due that day. A task leaves the lane once it has a block on that day.
  */
 function laneFor(ctx: Ctx, date: string, schedule: ScheduleItem[]): SometimeView[] {
-  const placed = new Set(schedule.flatMap((x) => (x.type === 'block' && x.taskId ? [x.taskId] : [])));
+  const placed = new Set(schedule.flatMap((x) => (x.type === 'block' ? [...(x.taskId ? [x.taskId] : []), ...x.items.map((i) => i.taskId)] : [])));
   const chip = (task: Rows<typeof t.tasks>[number], rolledFrom: string | null, due: boolean): SometimeView => ({
     taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, rolledFrom, minutes: blockLength(task), due,
   });
@@ -241,8 +272,8 @@ function dailyRows(ctx: Ctx, date: string): DailyRow[] {
     });
 }
 
-function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number]): TaskCard {
-  const block = ctx.data.blocks
+function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number], slots: ReturnType<typeof taskSlots>): TaskCard {
+  const block = slots
     .filter((b) => b.taskId === task.id && dayOf(utc(b.startAt), ctx.zone) >= ctx.today)
     .sort((a, b) => utc(a.startAt).toMillis() - utc(b.startAt).toMillis())[0];
   const some = ctx.data.sometime.find((s) => s.taskId === task.id);
@@ -251,7 +282,7 @@ function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number]): TaskCard {
     effectiveWindow: effectiveWindow(task, ctx.now, ctx.zone, ctx.homeZone),
     dueAt: task.dueAt, dueDate: task.dueDate, dueTone: dueTone(task, ctx.now, ctx.zone, ctx.homeZone),
     shortName: task.shortName, estLow: task.estLow, estHigh: task.estHigh, sittingMinutes: task.sittingMinutes,
-    sessionMinutes: task.sessionMinutes, conditionId: task.conditionId, condition: task.doneAt ? null : conditionOf(ctx, task), decisionYes: task.decisionYes ?? null, doneAt: task.doneAt,
+    sessionMinutes: task.sessionMinutes, quick: isQuick(task), conditionId: task.conditionId, condition: task.doneAt ? null : conditionOf(ctx, task), decisionYes: task.decisionYes ?? null, doneAt: task.doneAt,
     steps: stepsOf(ctx, task.id),
     scheduled: block ? { startAt: block.startAt } : some && some.date >= ctx.today ? { sometime: some.date } : null,
   };
@@ -284,12 +315,19 @@ function planning(ctx: Ctx) {
   const bed = dayMinute(s.bedTime);
   const nowMin = minutesOnDay(ctx.now, ctx.today, ctx.zone);
   const clock: PlanClock = { now: ctx.now, today: ctx.today, zone: ctx.zone, homeZone: ctx.homeZone };
-  const ends = (b: Rows<typeof t.blocks>[number]) => utc(b.startAt).plus({ minutes: b.durationMinutes });
+  const ends = (b: { startAt: string; durationMinutes: number }) => utc(b.startAt).plus({ minutes: b.durationMinutes });
+  const slots = taskSlots(ctx);
+  const slotEnds = (x: (typeof slots)[number]) => utc(x.startAt).plus({ minutes: ctx.data.blocks.find((b) => b.id === x.blockId)!.durationMinutes });
 
-  /** Each day's free window and busy time. Blocks in `skip` count as free. */
-  const day = (date: string, skip: Set<string> = new Set()): DayFree => ({
-    date, ...freeWindow(date, ctx.today, nowMin, wake, bed), busy: busyOf(scheduleFor(ctx, date).schedule, skip),
-  });
+  /** Each day's free window and busy time. Blocks in `skip` count as free. Quick blocks still to come can take more. */
+  const day = (date: string, skip: Set<string> = new Set()): DayFree => {
+    const schedule = scheduleFor(ctx, date).schedule;
+    return {
+      date, ...freeWindow(date, ctx.today, nowMin, wake, bed), busy: busyOf(schedule, skip),
+      batches: schedule.flatMap((x) => (x.type === 'block' && x.kind === 'quick' && !skip.has(x.id) && utc(x.startAt) > ctx.now
+        ? [{ blockId: x.id, startMin: x.startMin, minutes: x.durationMinutes }] : [])),
+    };
+  };
 
   /** Tasks as the planner sees them. A task is scheduled when it has a block that hasn't ended, other than those in `skip`. */
   const tasks = (skip: Set<string> = new Set()): PlanTask[] => ctx.data.tasks.map((task) => {
@@ -299,7 +337,8 @@ function planning(ctx: Ctx) {
       estLow: task.estLow, estHigh: task.estHigh, sittingMinutes: task.sittingMinutes, sessionMinutes: task.sessionMinutes,
       doneAt: task.doneAt, steps: stepsOf(ctx, task.id),
       sometime: some ? { date: some.date, rolledFrom: some.rolledFrom } : null,
-      scheduled: ctx.data.blocks.some((b) => b.taskId === task.id && !skip.has(b.id) && ends(b) > ctx.now),
+      scheduled: slots.some((x) => x.taskId === task.id && !skip.has(x.blockId) && slotEnds(x) > ctx.now),
+      quick: isQuick(task),
       ifPending: !!openQuestion(ctx, task.conditionId),
       after: prereqOf(task, skip),
     };
@@ -309,7 +348,8 @@ function planning(ctx: Ctx) {
   const prereqOf = (task: Rows<typeof t.tasks>[number], skip: Set<string>): Prereq | null => {
     const pre = prerequisite(ctx, task);
     if (!pre) return null;
-    const placed = pre.block ? [pre.block] : ctx.data.blocks.filter((b) => b.taskId === pre.task!.id && !skip.has(b.id));
+    const placed = pre.block ? [pre.block] : slots.filter((x) => x.taskId === pre.task!.id && !skip.has(x.blockId))
+      .map((x) => ctx.data.blocks.find((b) => b.id === x.blockId)!);
     const last = placed.sort((a, b) => ends(a).toMillis() - ends(b).toMillis()).at(-1);
     if (!last) return { taskId: pre.task?.id ?? null, ends: null };
     const date = dayOf(utc(last.startAt), ctx.zone);
@@ -319,14 +359,14 @@ function planning(ctx: Ctx) {
   /** Minutes already on the schedule for each task from now on: time set aside for it. */
   const setAside = () => {
     const out = new Map<string, number>();
-    for (const b of ctx.data.blocks) {
-      if (!b.taskId || utc(b.startAt) < ctx.now) continue;
-      out.set(b.taskId, (out.get(b.taskId) ?? 0) + b.durationMinutes);
+    for (const x of slots) {
+      if (utc(x.startAt) < ctx.now) continue;
+      out.set(x.taskId, (out.get(x.taskId) ?? 0) + x.minutes);
     }
     return out;
   };
 
-  return { clock, day, tasks, setAside, blocks: ctx.data.blocks, zone: ctx.zone, today: ctx.today, settings: s };
+  return { clock, day, tasks, setAside, blocks: ctx.data.blocks, quickItems: ctx.data.quickItems, zone: ctx.zone, today: ctx.today, settings: s };
 }
 
 /** What the Plan button and automatic scheduling read (spec §12). */
@@ -336,7 +376,8 @@ export function dayView(db: Db, now: DateTime, date: string | undefined, deviceZ
   const ctx = context(db, now, deviceZone);
   const plan = planning(ctx);
   const day = date ?? ctx.today;
-  const cards = new Map(ctx.data.tasks.map((task) => [task.id, taskCard(ctx, task)]));
+  const slots = taskSlots(ctx);
+  const cards = new Map(ctx.data.tasks.map((task) => [task.id, taskCard(ctx, task, slots)]));
   const g = groupTasks(ctx.data.tasks, now, ctx.zone, ctx.homeZone);
   const toCards = (list: { id: string }[]) => list.map((x) => cards.get(x.id)!);
   const name = (task: Rows<typeof t.tasks>[number]) => deadlineName(task, ctx.data.classes);
@@ -420,7 +461,8 @@ export function rolloverInputs(db: Db, now: DateTime, deviceZone?: string) {
     today: ctx.today,
     zone: ctx.zone,
     tasks: ctx.data.tasks,
-    taskBlocks: ctx.data.blocks.flatMap((b) => (b.taskId ? [{ id: b.id, taskId: b.taskId, startAt: b.startAt }] : [])),
+    // A task in a "Quick things" block shows up as "blockId:taskId", so rollover takes it out of the batch.
+    taskBlocks: taskSlots(ctx).map((x) => ({ id: x.batched ? `${x.blockId}:${x.taskId}` : x.blockId, taskId: x.taskId, startAt: x.startAt })),
     sometime: ctx.data.sometime,
   };
 }

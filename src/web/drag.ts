@@ -8,7 +8,8 @@ import type { Shown } from './Schedule';
 // server makes the change.
 
 export type DragItem =
-  | { type: 'task'; taskId: string; title: string; minutes: number }
+  /** A task card, or a task inside a "Quick things" block (`fromBatch`). Quick ones can join a batch. */
+  | { type: 'task'; taskId: string; title: string; minutes: number; quick?: boolean; fromBatch?: string }
   | { type: 'sometime'; taskId: string; title: string; minutes: number }
   /** A Daily checklist row. */
   | { type: 'routine'; routineId: string; title: string; minutes: number }
@@ -16,11 +17,13 @@ export type DragItem =
   /** A block's bottom edge. */
   | { type: 'resize'; b: Shown; title: string; minutes: number };
 
-export type DropZone = 'grid' | 'sometime' | 'tasks';
+export type DropZone = 'grid' | 'sometime' | 'tasks' | 'batch';
 
 export type DropTarget =
   | { kind: 'grid'; startMin: number }
   | { kind: 'sometime' }
+  /** Onto a "Quick things" block, which the task joins (spec §10). */
+  | { kind: 'batch'; blockId: string }
   | { kind: 'tasks' }
   | { kind: 'resize'; minutes: number };
 
@@ -46,7 +49,8 @@ export function accepts(item: DragItem, zone: DropZone): boolean {
   if (item.type === 'resize') return false;
   if (zone === 'grid') return item.type !== 'block' || movable(item.b);
   if (zone === 'sometime') return item.type === 'task' || (item.type === 'block' && isTaskBlock(item.b));
-  return item.type === 'sometime' || (item.type === 'block' && movable(item.b));
+  if (zone === 'batch') return item.type === 'task' && !!item.quick;
+  return item.type === 'sometime' || (item.type === 'task' && !!item.fromBatch) || (item.type === 'block' && movable(item.b));
 }
 
 const HOLD_MS = 280;
@@ -221,8 +225,14 @@ class DragController {
     s.strip = null;
     clearTimeout(s.stripTimer);
 
-    const zone = under?.closest<HTMLElement>('[data-drop]')?.dataset.drop as DropZone | undefined;
+    let zoneEl = under?.closest<HTMLElement>('[data-drop]');
+    // A "Quick things" block takes quick tasks. Anything else dropped on it goes on the schedule there.
+    if (zoneEl?.dataset.drop === 'batch' && (!accepts(s.item, 'batch') || (s.item.type === 'task' && s.item.fromBatch === zoneEl.dataset.block))) {
+      zoneEl = zoneEl.parentElement?.closest<HTMLElement>('[data-drop]');
+    }
+    const zone = zoneEl?.dataset.drop as DropZone | undefined;
     if (!zone || !accepts(s.item, zone)) return this.target(null);
+    if (zone === 'batch') return this.target({ kind: 'batch', blockId: zoneEl!.dataset.block! });
     if (zone === 'grid') {
       const m = gridMinute(s.offY);
       const startMin = m == null || !geo ? null : dropStart(geo.segs, m, s.item.minutes, geo.nowMin);

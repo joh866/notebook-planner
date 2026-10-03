@@ -8,7 +8,7 @@ const placed = { startAt: '2026-10-02T20:00:00Z', startMin: 900, endMin: 960 };
 const block = (over: Partial<BlockItem>): BlockItem => ({
   type: 'block', id: 'b', kind: 'task', title: 'Read', categoryId: null, taskId: 't', durationMinutes: 60, tentative: false,
   label: null, location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null,
-  condition: null, askNow: false, ...placed, ...over,
+  condition: null, askNow: false, items: [], ...placed, ...over,
 });
 const routine: RoutineItem = {
   type: 'routine', id: 's@d', slotId: 's', routineId: 'r', title: 'Night routine', categoryId: 'routine', start: '15:00',
@@ -62,5 +62,17 @@ describe('drop rules (spec §10)', () => {
   it('a resize never lands in a drop zone', () => {
     const b = shown(block({}), TODAY);
     expect(accepts({ type: 'resize', b, title: 'Read', minutes: 60 }, 'grid')).toBe(false);
+  });
+});
+
+describe('Quick things drops (spec §10)', () => {
+  it('a "Quick things" block takes quick tasks, and the list takes a task dragged out of one', () => {
+    const quick: DragItem = { type: 'task', taskId: 't', title: 'Text Sam', minutes: 10, quick: true };
+    const long: DragItem = { type: 'task', taskId: 'r', title: 'Read', minutes: 75 };
+    expect(accepts(quick, 'batch')).toBe(true);
+    expect(accepts(long, 'batch')).toBe(false);
+    expect(accepts({ ...quick, fromBatch: 'qb' }, 'tasks')).toBe(true);
+    expect(accepts(quick, 'tasks')).toBe(false);
+    expect(accepts({ ...quick, fromBatch: 'qb' }, 'grid')).toBe(true);
   });
 });

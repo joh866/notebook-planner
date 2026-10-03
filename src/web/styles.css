@@ -142,6 +142,13 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .block.skipped { background:transparent; border:1.5px dashed var(--muted); opacity:.6; }
 .block.skipped .tt { text-decoration:line-through; }
 .block.missed { box-shadow:inset 0 0 0 1.5px var(--red); }
+/* Quick things: one block listing short tasks, each with its own checkbox (spec §7). */
+.block.quick { background:var(--card); border:1.5px solid var(--frame); overflow:hidden; }
+.block.quick .qi { list-style:none; margin:3px 0 0; padding:0; }
+.block.quick .qi li { display:flex; align-items:center; gap:7px; font-size:12.5px; padding:1px 0; cursor:grab; touch-action:pan-y; }
+.block.quick .qi li .cb { position:static; width:13px; height:13px; flex:none; }
+.block.quick .qi li.done span { text-decoration:line-through; color:var(--muted); }
+.block.quick.drop-on { outline:2px dashed var(--accent); outline-offset:1px; }
 .block.missed .bm { color:var(--red); }
 .block .resize { position:absolute; left:0; right:0; bottom:0; height:9px; cursor:ns-resize; touch-action:none; }
 .block .resize::after { content:''; position:absolute; left:50%; bottom:2px; width:22px; height:3px; margin-left:-11px; border-radius:2px; background:var(--muted); opacity:0; transition:opacity .15s; }
@@ -177,6 +184,9 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .check-row.done .t { text-decoration:line-through; color:var(--muted); }
 .check-row.dragging { opacity:.35; }
 .check-row:hover .del { opacity:.75; }
+.check-row .opener { border:0; background:none; padding:0; text-align:left; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.check-row .chev { color:var(--muted); font-size:11px; }
+.check-row.step { padding-left:26px; cursor:default; font-size:13.5px; }
 .lane { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-height:46px; padding:8px; border:1.5px dashed var(--line); border-radius:6px; }
 .lane .empty { font-size:12.5px; color:var(--muted); }
 .chip { display:inline-flex; align-items:center; gap:8px; padding:4px 4px 4px 9px; border:1px solid var(--card-border); background:var(--card); border-radius:6px; font-size:13px; cursor:grab; touch-action:pan-y; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }

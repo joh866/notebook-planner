@@ -23,7 +23,7 @@ import { Check, Del, PencilIcon, PinIcon, PlusIcon, RepeatIcon } from './icons';
 export interface Shown {
   key: string;
   item: ScheduleItem;
-  look: 'class' | 'skipped' | 'routine' | 'event' | 'tentative' | 'open' | 'task';
+  look: 'class' | 'skipped' | 'routine' | 'event' | 'tentative' | 'open' | 'task' | 'quick';
   startMin: number;
   endMin: number;
   title: string;
@@ -66,6 +66,12 @@ export function shown(item: ScheduleItem, today: string): Shown {
   if (item.kind === 'open') {
     return { ...base, look: 'open', title: item.title ?? 'Open time', sub: item.label ?? range, categoryId: item.categoryId, done: false, checkable: false };
   }
+  if (item.kind === 'quick') {
+    return {
+      ...base, look: 'quick', title: 'Quick things', sub: `${range}, ${item.items.length} ${item.items.length === 1 ? 'thing' : 'things'}`,
+      categoryId: item.categoryId, done: item.done, checkable: false, pinned: item.pinned, penciled: !item.pinned, missed: item.missed,
+    };
+  }
   if (item.kind === 'event') {
     return {
       ...base, look: item.tentative ? 'tentative' : 'event', title: item.title ?? 'Event', sub: item.label ?? range,
@@ -86,7 +92,7 @@ export function removeLabel(b: Shown): string {
   const item = b.item;
   if (item.type === 'class') return item.skipped ? 'Not skipping' : 'Skip this one';
   if (item.type === 'routine') return 'Skip this day';
-  return item.kind === 'task' ? 'Back to the list' : 'Remove';
+  return item.kind === 'task' || item.kind === 'quick' ? 'Back to the list' : 'Remove';
 }
 
 interface Props {
@@ -195,12 +201,12 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
           </div>
         ))}
         {open.map((b) => (
-          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} onStillOn={onStillOn} begin={drag.begin} />
+          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} onStillOn={onStillOn} onCheckTask={onCheckTask} begin={drag.begin} dropOn={t?.kind === 'batch' && t.blockId === b.item.id} />
         ))}
         {rest.map((b, i) => (
           <Block
             key={b.key} b={b} col={cols[i]!.col} cols={cols[i]!.cols} y={y} categories={categories}
-            onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} onStillOn={onStillOn} begin={drag.begin}
+            onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} onStillOn={onStillOn} onCheckTask={onCheckTask} begin={drag.begin} dropOn={t?.kind === 'batch' && t.blockId === b.item.id}
           />
         ))}
         {ghost && (
@@ -258,10 +264,13 @@ interface BlockProps {
   onDetails: (b: Shown, el: HTMLElement) => void;
   onRemove: (b: Shown) => void;
   onStillOn: (b: Shown, yes: boolean) => void;
+  onCheckTask: (taskId: string, done: boolean) => void;
   begin: BeginDrag;
+  /** A quick task is being dragged over this "Quick things" block. */
+  dropOn?: boolean;
 }
 
-function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onStillOn, begin }: BlockProps) {
+function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onStillOn, onCheckTask, begin, dropOn }: BlockProps) {
   const top = y(b.startMin);
   const height = Math.max(y(b.endMin) - top - 3, 20);
   const short = height < 37;
@@ -269,7 +278,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onSt
   const minutes = b.endMin - b.startMin;
   const cls = [
     'block', b.look, b.done && 'done', !b.checkable && 'nocb', !moves && 'nodrag', b.missed && 'missed', short && 'short',
-    b.parts.length && 'has-parts', b.cond && 'conditional',
+    b.parts.length && 'has-parts', b.cond && 'conditional', dropOn && 'drop-on',
   ].filter(Boolean).join(' ');
   const style = {
     ...catStyle(categories, b.categoryId),
@@ -283,6 +292,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onSt
     <div
       className={cls}
       style={style}
+      {...(b.look === 'quick' ? { 'data-drop': 'batch', 'data-block': b.item.id } : {})}
       role="button"
       tabIndex={0}
       aria-label={`${b.title}, ${fmtRange(b.startMin, b.endMin)}. Details`}
@@ -313,6 +323,24 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onSt
       </div>
       {b.cond && <div className="bc">{b.cond}</div>}
       <div className="bm">{b.sub}</div>
+      {b.item.type === 'block' && b.item.items.length > 0 && (
+        <ul className="qi">
+          {b.item.items.map((x) => (
+            <li
+              key={x.taskId}
+              className={x.done ? 'done' : undefined}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                if (!x.done) begin(e, { type: 'task', taskId: x.taskId, title: x.title, minutes: x.minutes, quick: true, fromBatch: b.item.id }, e.currentTarget);
+              }}
+            >
+              <Check checked={x.done} label={x.title} onToggle={() => onCheckTask(x.taskId, !x.done)} />
+              <span>{x.title}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {b.askNow && (
         <div className="ask" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
           Still on?

@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import { addDays } from '../core/day';
 import { lookForHour } from '../core/look';
 import { minutesOnDay } from '../core/time';
-import type { AddResult, DailyRow, DropInput, StepView, TaskCard } from '../shared/api';
+import type { AddResult, DailyRow, DropInput, RoutineStepView, StepView, TaskCard } from '../shared/api';
 import { addMessage } from './addMessage';
 import { categoryName, catName, nextColor } from './cats';
 import { ClassDialog, classTitle } from './ClassDialog';
@@ -234,6 +234,7 @@ export function App() {
     });
   };
   const checkRoutine = (r: DailyRow) => act(() => api.setRoutineChecked(r.routineId, data!.day.date, !r.checked));
+  const checkRoutineStep = (st: RoutineStepView) => act(() => api.setRoutineStepChecked(st.id, data!.day.date, !st.checked));
   const checkBlock = (b: Shown) => {
     const item = b.item;
     if (item.type === 'routine') return act(() => api.setRoutineChecked(item.routineId, data!.day.date, !item.checked));
@@ -268,7 +269,7 @@ export function App() {
         })(),
       }]);
     }
-    return change(() => api.deleteBlock(item.id), item.kind === 'task' ? 'Back on your list.' : `Removed “${b.title}”.`);
+    return change(() => api.deleteBlock(item.id), item.kind === 'task' || item.kind === 'quick' ? 'Back on your list.' : `Removed “${b.title}”.`);
   };
 
   const pinBlock = (b: Shown) => {
@@ -351,14 +352,22 @@ export function App() {
       return;
     }
 
+    if (target.kind === 'batch') {
+      if (item.type !== 'task') return;
+      return change(() => api.drop({ action: 'joinBatch', taskId: item.taskId, blockId: target.blockId }), `Added “${item.title}” to Quick things.`);
+    }
+
     // Onto the task panel.
     if (item.type === 'sometime') return change(() => api.clearSometime(item.taskId), 'Back on your list.');
+    if (item.type === 'task' && item.fromBatch) {
+      return change(() => api.drop({ action: 'leaveBatch', taskId: item.taskId, blockId: item.fromBatch! }), 'Back on your list.');
+    }
     if (item.type !== 'block') return;
     const b = item.b.item;
     if (b.type === 'routine') {
       return change(() => api.deleteSlot(b.slotId), `${item.title} is off the schedule. It’s still in your checklist.`);
     }
-    if (b.type === 'block') return change(() => api.deleteBlock(b.id), b.kind === 'task' ? 'Back on your list.' : `Removed “${item.title}”.`);
+    if (b.type === 'block') return change(() => api.deleteBlock(b.id), b.kind === 'task' || b.kind === 'quick' ? 'Back on your list.' : `Removed “${item.title}”.`);
   };
 
   const drag = useDrag({
@@ -383,6 +392,7 @@ export function App() {
   const actions: TaskActions = {
     checkTask,
     checkRoutine,
+    checkRoutineStep,
     deleteTask: (t) => {
       if (openId === t.id) setOpenId(null);
       void change(() => api.deleteTask(t.id), `Deleted “${t.title}”.`);

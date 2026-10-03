@@ -7,8 +7,8 @@ export type Health = z.infer<typeof HealthSchema>;
 export const WindowSchema = z.enum(['near', 'week', 'soon', 'ongoing', 'decide']);
 export type Window = z.infer<typeof WindowSchema>;
 
-/** One-off blocks on the schedule (spec §7). */
-export const BlockKindSchema = z.enum(['event', 'open', 'task']);
+/** One-off blocks on the schedule (spec §7). A "quick" block holds Quick things (spec §10). */
+export const BlockKindSchema = z.enum(['event', 'open', 'task', 'quick']);
 export type BlockKind = z.infer<typeof BlockKindSchema>;
 
 export const LookSettingSchema = z.enum(['auto', 'day', 'night']);

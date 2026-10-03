@@ -68,9 +68,10 @@ describe('v0.4 data migration', () => {
       `);
     });
     const routine = (id: string) => db.select().from(t.routines).where(eq(t.routines.id, id)).get();
-    expect(routine('gratitude')?.durationMinutes).toBe(20);
+    // Gratitude is a morning step since v0.5, and keeps the length the user gave it.
+    expect(db.select().from(t.routineSteps).where(eq(t.routineSteps.id, 'morning-step-6')).get()?.minutes).toBe(20);
     expect(routine('laundry')?.durationMinutes).toBe(90);
-    expect(db.select().from(t.routineSteps).all()).toHaveLength(0);
+    expect(db.select().from(t.routineSteps).where(eq(t.routineSteps.routineId, 'laundry')).all()).toHaveLength(0);
     expect(routine('dorm')?.durationMinutes).toBe(30); // unchanged by the user, so it still updates
 
     const steps = db.select().from(t.taskSteps).where(eq(t.taskSteps.taskId, 'shopping')).orderBy(t.taskSteps.sortOrder).all();
@@ -113,5 +114,30 @@ describe('v0.5 data migration (conditions)', () => {
     expect(db.select().from(t.conditions).where(eq(t.conditions.id, 'arch')).get()?.phrase).toBe('if I get into ARCH');
     expect(task('muqaddimah')?.afterTaskId).toBe('get-book');
     expect(task('response')?.afterTaskId).toBe('muqaddimah');
+  });
+});
+
+describe('v0.5 data migration (routine steps)', () => {
+  it('turns meditate and gratitude into morning steps, keeping their check history and the gratitude streak', () => {
+    const db = migratedV03((sqlite) => {
+      sqlite.exec(`
+        INSERT INTO routine_checks (routine_id, date) VALUES ('gratitude', '2026-10-01'), ('gratitude', '2026-10-02'), ('meditate', '2026-10-02');
+      `);
+    });
+    expect(db.select().from(t.routines).all().map((r) => r.id).sort()).toEqual(['dorm', 'laundry', 'morning', 'night', 'supplements']);
+    const steps = db.select().from(t.routineSteps).where(eq(t.routineSteps.routineId, 'morning')).orderBy(t.routineSteps.sortOrder).all();
+    expect(steps.map((s) => [s.title, s.minutes, s.showStreak])).toEqual([
+      ['Brush teeth', null, false], ['Shower', null, false], ['Breakfast', null, false], ['Get dressed', null, false],
+      ['Meditate', 10, false], ['Gratitude journal, 5 things', 5, true],
+    ]);
+    const checks = db.select().from(t.routineStepChecks).all().map((c) => `${c.stepId}@${c.date}`).sort();
+    expect(checks).toEqual(['morning-step-5@2026-10-02', 'morning-step-6@2026-10-01', 'morning-step-6@2026-10-02']);
+    expect(db.select().from(t.routines).where(eq(t.routines.id, 'night')).get()?.title).toBe('Night routine');
+  });
+
+  it('leaves a routine the user renamed alone', () => {
+    const db = migratedV03((sqlite) => sqlite.exec(`UPDATE routines SET title = 'Sit quietly' WHERE id = 'meditate';`));
+    expect(db.select().from(t.routines).where(eq(t.routines.id, 'meditate')).get()?.title).toBe('Sit quietly');
+    expect(db.select().from(t.routines).where(eq(t.routines.id, 'gratitude')).get()).toBeUndefined();
   });
 });

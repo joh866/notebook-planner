@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { blockLength } from '../core/length';
-import type { CategoryView, DailyRow, DayView, StepView, TaskCard } from '../shared/api';
+import type { CategoryView, DailyRow, DayView, RoutineStepView, StepView, TaskCard } from '../shared/api';
 import { catName, catStyle } from './cats';
 import { cap, clockMin, deadlineOn, dueLabel, fmtDur, fmtTime, momentOn, relWord } from './format';
 import type { BeginDrag } from './drag';
@@ -11,6 +11,7 @@ import { Check, Del, RepeatIcon } from './icons';
 export interface TaskActions {
   checkTask: (id: string, done: boolean) => void;
   checkRoutine: (row: DailyRow) => void;
+  checkRoutineStep: (step: RoutineStepView) => void;
   deleteTask: (t: TaskCard) => void;
   deleteRoutine: (row: DailyRow) => void;
   decide: (t: TaskCard, yes: boolean) => void;
@@ -97,7 +98,7 @@ export function TaskPanel({ day, categories, filter, showDone, openId, onFilter,
           </div>
         )}
 
-        <Daily rows={day.daily} onCheck={actions.checkRoutine} onDelete={actions.deleteRoutine} begin={drag.begin} />
+        <Daily rows={day.daily} onCheck={actions.checkRoutine} onCheckStep={actions.checkRoutineStep} onDelete={actions.deleteRoutine} begin={drag.begin} />
 
         {GROUPS.map(([key, label]) => {
           const list = day.groups[key].filter(pass);
@@ -222,11 +223,19 @@ function GroupHead({ label, count, red }: { label: string; count: number; red?: 
 interface DailyProps {
   rows: DailyRow[];
   onCheck: (row: DailyRow) => void;
+  onCheckStep: (step: RoutineStepView) => void;
   onDelete: (row: DailyRow) => void;
   begin: BeginDrag;
 }
 
-function Daily({ rows, onCheck, onDelete, begin }: DailyProps) {
+function Daily({ rows, onCheck, onCheckStep, onDelete, begin }: DailyProps) {
+  // Routines opened to show their steps (spec §9).
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) => setOpen((s) => {
+    const next = new Set(s);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  });
   if (!rows.length) return null;
   return (
     <div>
@@ -236,15 +245,26 @@ function Daily({ rows, onCheck, onDelete, begin }: DailyProps) {
           {rows.filter((r) => r.checked).length} of {rows.length}
         </span>
       </h2>
-      {rows.map((r) => (
+      {rows.map((r) => {
+        const opened = open.has(r.routineId);
+        const done = r.steps.filter((s) => s.checked).length;
+        return (
+        <div key={r.routineId}>
         <div
-          key={r.routineId}
           className={`check-row${r.checked ? ' done' : ''}`}
           onPointerDown={(e) => begin(e, { type: 'routine', routineId: r.routineId, title: r.title, minutes: r.durationMinutes }, e.currentTarget)}
         >
           <Check checked={r.checked} label={r.title} onToggle={() => onCheck(r)} />
-          <span className="t">{r.title}</span>
+          {r.steps.length ? (
+            <button className="t opener" aria-expanded={opened} onClick={() => toggle(r.routineId)}>
+              {r.title}
+              <span className="chev" aria-hidden="true">{opened ? '▾' : '▸'}</span>
+            </button>
+          ) : (
+            <span className="t">{r.title}</span>
+          )}
           <span className="r">
+            {r.steps.length > 0 && <span>{done} of {r.steps.length}</span>}
             {r.streak ? <span>{r.streak}-day streak</span> : null}
             {r.time && (
               <span>
@@ -256,7 +276,18 @@ function Daily({ rows, onCheck, onDelete, begin }: DailyProps) {
           </span>
           <Del trash label={`Delete routine: ${r.title}`} onClick={() => onDelete(r)} />
         </div>
-      ))}
+        {opened && r.steps.map((st) => (
+          <div key={st.id} className={`check-row step${st.checked ? ' done' : ''}`}>
+            <Check checked={st.checked} label={st.title} onToggle={() => onCheckStep(st)} />
+            <span className="t">{st.title}</span>
+            <span className="r">
+              {st.streak ? <span>{st.streak}-day streak</span> : st.minutes ? <span>{st.minutes}m</span> : null}
+            </span>
+          </div>
+        ))}
+        </div>
+        );
+      })}
     </div>
   );
 }
@@ -384,7 +415,7 @@ function Card({ t, day, categories, open, fresh, onToggle, actions, begin }: Car
       aria-expanded={open}
       aria-label={`${t.title}. ${open ? 'Hide' : 'Show'} steps and notes`}
       onClick={(e) => !fromControl(e) && onToggle()}
-      onPointerDown={(e) => canDrag && begin(e, { type: 'task', taskId: t.id, title: t.title, minutes: blockLength(t) }, e.currentTarget)}
+      onPointerDown={(e) => canDrag && begin(e, { type: 'task', taskId: t.id, title: t.title, minutes: blockLength(t), quick: t.quick }, e.currentTarget)}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();

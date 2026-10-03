@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { asc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { DateTime } from 'luxon';
+import { DateTime } from 'luxon';
 import { dayOf } from '../core/day';
-import { blockLength } from '../core/length';
+import { BATCH_MAX, blockLength, quickLength } from '../core/length';
 import { atMinute, clockOf, resolveZone } from '../core/time';
 import { DropInputSchema, ZoneSchema, type DropInput, type DropResult } from '../shared/api';
 import type { Db } from './db/client';
@@ -49,6 +49,22 @@ function insert(tx: Tx, change: Change, name: TableName, row: Row) {
   change.created(name, [row]);
 }
 
+/**
+ * Takes a task out of its "Quick things" block, which shrinks by the task's minutes. An empty block
+ * goes away. Placing or committing a task on its own does this too (spec §10, "drag a task out to
+ * unbatch it").
+ */
+function unbatch(tx: Tx, change: Change, taskId: string, onlyBlock?: string) {
+  for (const item of tx.select().from(t.quickItems).where(eq(t.quickItems.taskId, taskId)).all()) {
+    if (onlyBlock && item.blockId !== onlyBlock) continue;
+    const task = need(tx, 'tasks', taskId, 'task');
+    remove(tx, change, 'quickItems', item);
+    const block = need(tx, 'blocks', item.blockId, 'block');
+    if (!tx.select().from(t.quickItems).where(eq(t.quickItems.blockId, item.blockId)).all().length) remove(tx, change, 'blocks', block);
+    else update(tx, change, 'blocks', block, { durationMinutes: Math.max(15, (block.durationMinutes as number) - quickLength(task)) });
+  }
+}
+
 /** Drops on today can't land in the past. */
 function startOn(ctx: Ctx, date: string, startMin: number): string {
   const at = atMinute(date, startMin, ctx.zone);
@@ -81,6 +97,7 @@ function drop(tx: Tx, change: Change, d: DropInput, ctx: Ctx): DropResult {
         throw new HTTPException(409, { message: 'Decision items can’t go on the schedule' });
       }
       const startAt = startOn(ctx, d.date, d.startMin);
+      unbatch(tx, change, task.id as string);
       const some = findRows(tx, 'sometime', whereKey('sometime', { taskId: task.id }))[0];
       if (some) remove(tx, change, 'sometime', some);
       insert(tx, change, 'blocks', {
@@ -99,10 +116,36 @@ function drop(tx: Tx, change: Change, d: DropInput, ctx: Ctx): DropResult {
         rolledFrom = block.rolledFrom;
         remove(tx, change, 'blocks', block);
       }
+      unbatch(tx, change, task.id as string);
       const existing = findRows(tx, 'sometime', whereKey('sometime', { taskId: task.id }))[0];
       const row = { taskId: task.id, date: d.date, rolledFrom: existing?.rolledFrom ?? rolledFrom ?? null };
       if (existing) update(tx, change, 'sometime', existing, row);
       else insert(tx, change, 'sometime', row);
+      return none;
+    }
+
+    case 'joinBatch': {
+      const task = need(tx, 'tasks', d.taskId, 'task');
+      const block = need(tx, 'blocks', d.blockId, 'block');
+      if (block.kind !== 'quick') throw new HTTPException(409, { message: 'That isn’t a Quick things block' });
+      if (task.doneAt || task.window === 'decide') throw new HTTPException(409, { message: 'Only open tasks can join' });
+      if (findRows(tx, 'quickItems', whereKey('quickItems', { blockId: block.id, taskId: task.id })).length) return none;
+      unbatch(tx, change, task.id as string);
+      const items = tx.select().from(t.quickItems).where(eq(t.quickItems.blockId, block.id as string)).all();
+      insert(tx, change, 'quickItems', { blockId: block.id, taskId: task.id, sortOrder: items.length });
+      // The block grows to fit, up to about 30 minutes, or stays as long as you made it.
+      const fresh = need(tx, 'blocks', block.id as string, 'block');
+      const total = [...items.map((x) => need(tx, 'tasks', x.taskId, 'task')), task].reduce((n, x) => n + quickLength(x), 0);
+      const minutes = Math.max(fresh.durationMinutes as number, Math.min(total, Math.max(BATCH_MAX, fresh.durationMinutes as number)));
+      if (minutes !== fresh.durationMinutes) update(tx, change, 'blocks', fresh, { durationMinutes: minutes });
+      const some = findRows(tx, 'sometime', whereKey('sometime', { taskId: task.id }))[0];
+      if (some && some.date === dayOf(DateTime.fromISO(block.startAt as string, { zone: 'utc' }), ctx.zone)) remove(tx, change, 'sometime', some);
+      return none;
+    }
+
+    case 'leaveBatch': {
+      need(tx, 'tasks', d.taskId, 'task');
+      unbatch(tx, change, d.taskId, d.blockId);
       return none;
     }
 

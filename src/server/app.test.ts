@@ -47,8 +47,9 @@ describe('GET /api/day', () => {
     expect(ofType(day, 'routine').map((r) => [r.routineId, r.startMin])).toEqual([['morning', 540], ['night', 1380]]);
     expect(ofType(day, 'block')).toEqual([expect.objectContaining({ id: 'rso-fair', kind: 'event', startMin: 900, pinned: true })]);
 
-    expect(day.daily.map((r) => r.routineId)).toEqual(['morning', 'meditate', 'gratitude', 'night']);
-    expect(day.daily.find((r) => r.routineId === 'gratitude')).toMatchObject({ streak: 0, checked: false });
+    // Meditate and gratitude are morning steps since spec v0.5, and gratitude keeps a streak on its step.
+    expect(day.daily.map((r) => r.routineId)).toEqual(['morning', 'night', 'supplements']);
+    expect(day.daily.find((r) => r.routineId === 'morning')?.steps.at(-1)).toMatchObject({ title: 'Gratitude journal, 5 things', streak: 0, checked: false });
     expect(day.daily.find((r) => r.routineId === 'morning')?.time).toBe('09:00');
 
     expect(ids(day.groups.overdue)).toEqual([]);
@@ -97,7 +98,7 @@ describe('GET /api/day', () => {
 
   it('adds weekly routines on their day, with laundry’s steps', async () => {
     const sat = await get<DayView>('/api/day/2026-10-03');
-    expect(sat.daily.map((r) => r.routineId)).toEqual(['morning', 'meditate', 'gratitude', 'night', 'laundry', 'dorm']);
+    expect(sat.daily.map((r) => r.routineId)).toEqual(['morning', 'night', 'supplements', 'laundry', 'dorm']);
     const laundry = sat.daily.find((r) => r.routineId === 'laundry')!;
     expect(laundry.steps.map((s) => [s.minutes, s.waiting])).toEqual([[10, false], [55, true], [5, false], [55, true], [15, false]]);
 
@@ -288,16 +289,30 @@ describe('blocks', () => {
 });
 
 describe('routines', () => {
-  it('checks a routine off for one day, with a streak', async () => {
-    await call('PUT', '/api/routine-checks/gratitude/2026-10-01');
-    const check = await call('PUT', '/api/routine-checks/gratitude/2026-10-02');
+  it('checks a step off for one day, with a streak on the gratitude step', async () => {
+    await call('PUT', '/api/routine-step-checks/morning-step-6/2026-10-01');
+    const check = await call('PUT', '/api/routine-step-checks/morning-step-6/2026-10-02');
     expect(check.status).toBe(200);
-    let row = (await get<DayView>('/api/day')).daily.find((r) => r.routineId === 'gratitude');
-    expect(row).toMatchObject({ checked: true, streak: 2 });
+    const gratitude = async () => (await get<DayView>('/api/day')).daily.find((r) => r.routineId === 'morning')?.steps.at(-1);
+    expect(await gratitude()).toMatchObject({ checked: true, streak: 2 });
 
     await undo(check.body.undo);
-    row = (await get<DayView>('/api/day')).daily.find((r) => r.routineId === 'gratitude');
-    expect(row).toMatchObject({ checked: false, streak: 1 });
+    expect(await gratitude()).toMatchObject({ checked: false, streak: 1 });
+  });
+
+  it('checks every step when the routine is checked, and the routine when every step is (spec §10)', async () => {
+    const supplements = async () => (await get<DayView>('/api/day')).daily.find((r) => r.routineId === 'supplements')!;
+    const all = await call<{ undo: string }>('PUT', '/api/routine-checks/supplements/2026-10-02');
+    expect((await supplements()).steps.map((s) => s.checked)).toEqual([true, true]);
+    await undo(all.body.undo);
+    expect(await supplements()).toMatchObject({ checked: false, steps: [{ checked: false }, { checked: false }] });
+
+    await call('PUT', '/api/routine-step-checks/supplements-step-1/2026-10-02');
+    expect((await supplements()).checked).toBe(false);
+    await call('PUT', '/api/routine-step-checks/supplements-step-2/2026-10-02');
+    expect((await supplements()).checked).toBe(true);
+    await call('DELETE', '/api/routine-step-checks/supplements-step-1/2026-10-02');
+    expect(await supplements()).toMatchObject({ checked: false, steps: [{ checked: false }, { checked: true }] });
   });
 
   it('checks routine steps off on their own', async () => {
@@ -333,9 +348,9 @@ describe('routines', () => {
   });
 
   it('puts a routine on the schedule with a new time', async () => {
-    const { body } = await call<{ item: { durationMinutes: number } }>('POST', '/api/routines/meditate/slots', { start: '21:00' });
-    expect(body.item.durationMinutes).toBe(10);
-    expect((await get<DayView>('/api/day')).daily.find((r) => r.routineId === 'meditate')?.time).toBe('21:00');
+    const { body } = await call<{ item: { durationMinutes: number } }>('POST', '/api/routines/supplements/slots', { start: '21:00' });
+    expect(body.item.durationMinutes).toBe(5);
+    expect((await get<DayView>('/api/day')).daily.find((r) => r.routineId === 'supplements')?.time).toBe('21:00');
   });
 
   it('validates repeats', async () => {
@@ -529,6 +544,6 @@ describe('decisions and check-ins', () => {
     await call('PUT', '/api/slot-exceptions/morning-slot/2026-10-02', { skipped: true });
     const day = await get<DayView>('/api/day');
     expect(day.daily.find((r) => r.routineId === 'morning')).toMatchObject({ skipped: true, time: null });
-    expect(day.daily.find((r) => r.routineId === 'meditate')).toMatchObject({ skipped: false });
+    expect(day.daily.find((r) => r.routineId === 'supplements')).toMatchObject({ skipped: false });
   });
 });

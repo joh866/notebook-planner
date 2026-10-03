@@ -68,6 +68,8 @@ export const tasks = sqliteTable('tasks', {
   decisionYes: text('decision_yes', { mode: 'json' }).$type<DecisionYes>(),
   doneAt: text('done_at'),
   durationFeedback: text('duration_feedback', { enum: opts(DurationFeedbackSchema) }),
+  /** Marked quick by the add box (a text, an email, a tiny chore). Anything estimated at 15 minutes or less counts too (spec §10). */
+  quick: integer('quick', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: createdAt(),
 });
@@ -117,6 +119,8 @@ export const routineSteps = sqliteTable('routine_steps', {
   title: text('title').notNull(),
   minutes: integer('minutes'),
   waiting: integer('waiting', { mode: 'boolean' }).notNull().default(false),
+  /** A streak can belong to a step, like gratitude (spec §9). */
+  showStreak: integer('show_streak', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
@@ -202,6 +206,17 @@ export const blocks = sqliteTable('blocks', {
   afterBlockId: text('after_block_id').references((): AnySQLiteColumn => blocks.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 });
+
+/** The tasks in a "Quick things" block (spec §10). A task is in one batch at most. */
+export const quickItems = sqliteTable(
+  'quick_items',
+  {
+    blockId: text('block_id').notNull().references(() => blocks.id, { onDelete: 'cascade' }),
+    taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.blockId, t.taskId] })],
+);
 
 /** Tasks committed to a day without a time (spec §7). One per task. */
 export const sometime = sqliteTable('sometime', {

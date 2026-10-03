@@ -50,6 +50,7 @@ export function detailLines(b: Shown, day: DayView): string[] {
     for (const p of b.parts) lines.push(`${p.title}, ${p.endMin - p.startMin}m${p.waiting ? ', waiting' : ''}`);
   } else {
     if (b.cond) lines.push(cap(b.cond));
+    for (const x of item.items) lines.push(`${x.done ? '✓ ' : ''}${x.title}, ${x.minutes}m`);
     if (item.location) lines.push(item.location);
     if (item.tentative && item.label) lines.push(item.label);
     if (item.kind === 'task') {

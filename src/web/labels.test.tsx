@@ -33,6 +33,9 @@ async function load() {
   await send('POST', '/api/blocks', { kind: 'event', title: 'Office hours', startAt: '2026-10-05T19:45:00Z', durationMinutes: 50, pinned: true });
   await send('POST', '/api/blocks', { kind: 'task', taskId: 'math-pset', startAt: '2026-10-05T21:15:00Z', durationMinutes: 75, pinned: false, reason: 'Due Wed 11am' });
   await send('POST', '/api/tasks', { title: 'Hand in the form', window: 'near', dueAt: '2026-10-05T18:30:00Z' });
+  // A "Quick things" block from the planner.
+  await send('POST', '/api/tasks', { title: 'Text Sam back', window: 'near', estLow: 5, estHigh: 5, quick: true });
+  await send('POST', `/api/plan?tz=${CHI}`, { date: DAY });
   const tz = `?tz=${CHI}`;
   return {
     day: await get<DayView>(`/api/day/${DAY}${tz}`),
@@ -81,6 +84,7 @@ describe('labels', () => {
 
     // The page shows afternoon times, in 12-hour form.
     expect(html).toContain('2:45');
+    expect(html).toContain('Quick things');
     expect(html).toContain('pm');
     const text = readable(`${html}\n${popovers}`);
     expect(text.match(TWENTY_FOUR)?.[0] ?? null).toBeNull();

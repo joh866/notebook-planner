@@ -10,7 +10,8 @@ describe('seed', () => {
     expect(seed(db)).toBe(true);
 
     expect(db.select().from(t.classes).all()).toHaveLength(4);
-    expect(db.select().from(t.routines).all()).toHaveLength(6);
+    // Morning, night, supplements, laundry, and the dorm (spec v0.5: meditate and gratitude are morning steps).
+    expect(db.select().from(t.routines).all()).toHaveLength(5);
     expect(db.select().from(t.conditions).all()).toHaveLength(3);
     expect(db.select().from(t.tasks).all()).toHaveLength(18);
 
@@ -48,7 +49,9 @@ describe('seed', () => {
     const db = openDb(':memory:');
     seed(db);
     const length = (id: string) => db.select().from(t.routines).where(eq(t.routines.id, id)).get()?.durationMinutes;
-    expect([length('meditate'), length('gratitude'), length('dorm')]).toEqual([10, 5, 30]);
+    const step = (id: string) => db.select().from(t.routineSteps).where(eq(t.routineSteps.id, id)).get()?.minutes;
+    // Meditate and gratitude kept their v0.4 lengths as morning steps (spec v0.5).
+    expect([step('morning-step-5'), step('morning-step-6'), length('dorm')]).toEqual([10, 5, 30]);
 
     const shopping = db.select().from(t.taskSteps).where(eq(t.taskSteps.taskId, 'shopping')).orderBy(t.taskSteps.sortOrder).all();
     expect(shopping.map((s) => s.title)).toEqual([

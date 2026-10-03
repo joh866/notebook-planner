@@ -57,6 +57,8 @@ export const ParsedItemSchema = z.object({
   end: opt(Clock),
   loc: opt(Short),
   tentative: opt(z.boolean()),
+  /** A task of about 15 minutes or less: a text, an email, a tiny chore (spec §10, "Quick things"). */
+  quick: opt(z.boolean()),
   /** For classes: "Lecture", "Discussion". */
   kind: opt(Short),
 });

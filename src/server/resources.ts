@@ -164,6 +164,16 @@ function resource(app: Hono, db: Db, run: Run, spec: ResourceSpec) {
  * A row keyed by an item and a day, like a routine checked on a date. PUT sets it, DELETE clears
  * it. Both are safe to repeat.
  */
+/** Turns a per-day row (a check) on or off, recording it for Undo. */
+function setDay(tx: Tx, change: Change, name: TableName, table: SQLiteTable, row: Row, on: boolean) {
+  const existing = findRows(tx, name, whereKey(name, row));
+  if (on && !existing.length) insert(tx, change, name, table, [row]);
+  if (!on && existing.length) {
+    change.before(name, existing);
+    tx.delete(table).where(whereKey(name, row)).run();
+  }
+}
+
 function dayToggle(app: Hono, run: Run, spec: {
   path: string;
   parent: TableName;
@@ -173,6 +183,8 @@ function dayToggle(app: Hono, run: Run, spec: {
   /** The row for this item and day. */
   row: (id: string, date: string, body: Row) => Row;
   body?: z.ZodType;
+  /** Runs in the same change after the item is turned on or off for the day. */
+  then?: (tx: Tx, change: Change, id: string, date: string, on: boolean) => void;
 }) {
   const route = `/api/${spec.path}/:id/:date`;
   const params = (c: Context) => ({ id: c.req.param('id')!, date: DaySchema.parse(c.req.param('date')) });
@@ -190,6 +202,7 @@ function dayToggle(app: Hono, run: Run, spec: {
       } else {
         insert(tx, change, spec.name, spec.table, [row]);
       }
+      spec.then?.(tx, change, id, date, true);
       return findRows(tx, spec.name, whereKey(spec.name, row))[0]!;
     }));
   });
@@ -201,6 +214,7 @@ function dayToggle(app: Hono, run: Run, spec: {
       const existing = findRows(tx, spec.name, whereKey(spec.name, key));
       change.before(spec.name, existing);
       tx.delete(spec.table).where(whereKey(spec.name, key)).run();
+      spec.then?.(tx, change, id, date, false);
       return null;
     }));
   });
@@ -272,10 +286,25 @@ export function registerResources(app: Hono, db: Db, run: Run) {
   dayToggle(app, run, {
     path: 'routine-checks', parent: 'routines', what: 'routine', name: 'routineChecks', table: t.routineChecks,
     row: (routineId, date) => ({ routineId, date }),
+    // Checking the routine checks all its steps; unchecking it clears them (spec §10, "Routine steps").
+    then: (tx, change, routineId, date, on) => {
+      for (const step of tx.select().from(t.routineSteps).where(eq(t.routineSteps.routineId, routineId)).all()) {
+        setDay(tx, change, 'routineStepChecks', t.routineStepChecks, { stepId: step.id, date }, on);
+      }
+    },
   });
   dayToggle(app, run, {
     path: 'routine-step-checks', parent: 'routineSteps', what: 'routine step', name: 'routineStepChecks', table: t.routineStepChecks,
     row: (stepId, date) => ({ stepId, date }),
+    // Checking every step checks the routine; unchecking one unchecks it.
+    then: (tx, change, stepId, date, on) => {
+      const step = tx.select().from(t.routineSteps).where(eq(t.routineSteps.id, stepId)).get()!;
+      const all = tx.select().from(t.routineSteps).where(eq(t.routineSteps.routineId, step.routineId)).all();
+      const checked = new Set(tx.select().from(t.routineStepChecks).where(eq(t.routineStepChecks.date, date)).all().map((c) => c.stepId));
+      if (!on || all.every((s) => checked.has(s.id))) {
+        setDay(tx, change, 'routineChecks', t.routineChecks, { routineId: step.routineId, date }, on);
+      }
+    },
   });
   dayToggle(app, run, {
     path: 'class-skips', parent: 'classes', what: 'class', name: 'classSkips', table: t.classSkips,

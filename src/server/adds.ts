@@ -193,7 +193,7 @@ class Adder {
       // Classes are never deadlines (spec §11): a short name that only names a class is dropped.
       shortName: p.short && !namesClass(p.short, this.classes) ? p.short : null,
       estLow: p.est?.[0] ?? null, estHigh: p.est?.[1] ?? null,
-      sittingMinutes: p.sitting ?? null, sessionMinutes: p.session ?? null,
+      sittingMinutes: p.sitting ?? null, sessionMinutes: p.session ?? null, quick: !!p.quick,
     };
     // A task that only names a class meeting gets no deadline.
     if (p.due && isDay(p.due.date) && !namesClass(p.title, this.classes)) {

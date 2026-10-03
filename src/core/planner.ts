@@ -2,7 +2,7 @@ import { DateTime } from 'luxon';
 import type { ScheduleItem } from '../shared/api';
 import type { Window } from '../shared/schemas';
 import { addDays, diffDays } from './day';
-import { blockLength } from './length';
+import { BATCH_MAX, blockLength, quickLength } from './length';
 import { stepParts } from './timeline';
 import { deadlineDay, effectiveWindow, isOverdue, type EffectiveWindow } from './urgency';
 import { minutesOnDay } from './time';
@@ -32,6 +32,8 @@ export interface DayFree {
   from: number;
   to: number;
   busy: Interval[];
+  /** "Quick things" blocks on the day that a new quick task can join (automatic scheduling). */
+  batches?: { blockId: string; startMin: number; minutes: number }[];
 }
 
 export function freeWindow(date: string, today: string, nowMin: number | null, wakeMin: number, bedMin: number): { from: number; to: number } {
@@ -128,6 +130,8 @@ export interface PlanTask {
   ifPending: boolean;
   /** Its "after" condition, while the prerequisite isn't done. */
   after: Prereq | null;
+  /** A quick task goes in a "Quick things" block (spec §10). */
+  quick?: boolean;
 }
 
 /** What an "after" item comes after (spec §10, "Conditions"). */
@@ -212,7 +216,14 @@ export interface Placement {
   minutes: number;
   reason: string;
   rolledFrom: string | null;
+  /** A new "Quick things" block holding these tasks, `taskId` first. */
+  batch?: string[];
+  /** Joins this "Quick things" block instead, which grows by `minutes`. "new:<taskId>" is a batch made earlier in the same run. */
+  joinBlockId?: string;
 }
+
+const QUICK_REASON = 'Quick things';
+const batchable = (t: PlanTask) => !!t.quick && !t.after;
 
 /**
  * Plans one day (spec §12, "Plan button"): scores every unfinished task that isn't scheduled and
@@ -222,13 +233,26 @@ export interface Placement {
  */
 export function planDay(day: DayFree, tasks: PlanTask[], c: PlanClock, keep: Map<string, number> = new Map()): Placement[] {
   const busy = [...day.busy];
-  const left = tasks
+  const scored = tasks
     .filter((t) => !t.scheduled && (!t.sometime || t.sometime.date === day.date))
     .flatMap((t) => {
       const s = scoreTask(t, day.date, c);
-      return s ? [{ t, ...s }] : [];
+      return s ? [{ t, ...s, members: [t] }] : [];
     })
     .sort((a, b) => b.score - a.score);
+  // Quick tasks go together in "Quick things" blocks of about 30 minutes, placed where the first
+  // (best-scoring) one would go (spec §10, "Quick things").
+  const left: typeof scored = [];
+  let open: (typeof scored)[number] | null = null;
+  for (const x of scored) {
+    if (!batchable(x.t) || keep.has(x.t.id)) {
+      left.push(x);
+      continue;
+    }
+    const used = open ? open.members.reduce((n, m) => n + quickLength(m), 0) : Infinity;
+    if (open && used + quickLength(x.t) <= BATCH_MAX) open.members.push(x.t);
+    else left.push((open = { ...x, reason: QUICK_REASON, members: [x.t] }));
+  }
 
   const out: Placement[] = [];
   const placed = new Map<string, { date: string; min: number }>();
@@ -237,15 +261,20 @@ export function planDay(day: DayFree, tasks: PlanTask[], c: PlanClock, keep: Map
     const pending = new Set(left.map((x) => x.t.id));
     const i = left.findIndex(({ t }) => afterGate(t, day.date, placed, pending) !== 'wait');
     if (i < 0) break;
-    const { t, reason } = left.splice(i, 1)[0]!;
+    const { t, reason, members } = left.splice(i, 1)[0]!;
     const gate = afterGate(t, day.date, placed, pending);
     if (gate === 'never' || gate === 'wait') continue;
-    const shape = lengthOf(t, keep.get(t.id));
-    const at = firstFit(Math.max(day.from, gate ?? -Infinity), limitOn(t, day.date, c, day.to), shape, busy);
+    const batch = reason === QUICK_REASON;
+    const shape = batch ? shapeOf(members.reduce((n, m) => n + quickLength(m), 0), []) : lengthOf(t, keep.get(t.id));
+    const limit = Math.min(...members.map((m) => limitOn(m, day.date, c, day.to)));
+    const at = firstFit(Math.max(day.from, gate ?? -Infinity), limit, shape, busy);
     if (at == null) continue;
     busy.push(...shape.handsOn.map(([a, b]): Interval => [at + a, at + b]));
-    placed.set(t.id, { date: day.date, min: at + shape.minutes });
-    out.push({ taskId: t.id, date: day.date, startMin: at, minutes: shape.minutes, reason, rolledFrom: t.sometime?.rolledFrom ?? null });
+    for (const m of members) placed.set(m.id, { date: day.date, min: at + shape.minutes });
+    out.push({
+      taskId: t.id, date: day.date, startMin: at, minutes: shape.minutes, reason, rolledFrom: t.sometime?.rolledFrom ?? null,
+      ...(batch ? { batch: members.map((m) => m.id) } : {}),
+    });
   }
   return out;
 }
@@ -286,6 +315,13 @@ export function placeNew(tasks: PlanTask[], c: PlanClock, dayFree: (date: string
       const gate = afterGate(t, date, placed, new Set());
       if (gate === 'never' || gate === 'wait') continue;
       const day = get(date);
+      if (batchable(t)) {
+        const p = placeQuick(t, day, limitOn(t, date, c, day.to));
+        if (!p) continue;
+        placed.set(t.id, { date, min: p.startMin + p.minutes });
+        out.push({ ...p, taskId: t.id, date, reason: QUICK_REASON, rolledFrom: t.sometime?.rolledFrom ?? null });
+        break;
+      }
       const shape = lengthOf(t);
       const at = firstFit(Math.max(day.from, gate ?? -Infinity), limitOn(t, date, c, day.to), shape, day.busy);
       if (at == null) continue;
@@ -297,6 +333,29 @@ export function placeNew(tasks: PlanTask[], c: PlanClock, dayFree: (date: string
     }
   }
   return out;
+}
+
+/**
+ * A new quick task on a day (automatic scheduling): it joins a "Quick things" block with room that
+ * can grow, or starts a new one in the first free slot. Updates the day's busy time and batches.
+ */
+function placeQuick(t: PlanTask, day: DayFree, limit: number): Pick<Placement, 'startMin' | 'minutes' | 'batch' | 'joinBlockId'> | null {
+  const len = quickLength(t);
+  day.batches ??= [];
+  for (const b of day.batches) {
+    const end = b.startMin + b.minutes;
+    if (b.minutes + len > BATCH_MAX || end + len > limit) continue;
+    const others = day.busy.filter(([x, y]) => !(x === b.startMin && y === end));
+    if (clashes(end, end + len, others)) continue;
+    day.busy = [...others, [b.startMin, end + len]];
+    b.minutes += len;
+    return { startMin: b.startMin, minutes: len, joinBlockId: b.blockId };
+  }
+  const at = firstFit(day.from, limit, shapeOf(len, []), day.busy);
+  if (at == null) return null;
+  day.busy.push([at, at + len]);
+  day.batches.push({ blockId: `new:${t.id}`, startMin: at, minutes: len });
+  return { startMin: at, minutes: len, batch: [t.id] };
 }
 
 /** About how much work is left on a task: the middle of its estimate (or 30 minutes), less finished steps. */
