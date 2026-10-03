@@ -7,13 +7,6 @@ import { compareByDeadline, effectiveWindow, type UrgencyTask } from './urgency'
 export interface GroupTask extends UrgencyTask {
   id: string;
   sortOrder: number;
-  conditionId?: string | null;
-}
-
-export interface WaitingGroup<T> {
-  /** The check-in question these tasks wait on, or null for tasks without one. */
-  conditionId: string | null;
-  tasks: T[];
 }
 
 export interface TaskGroups<T> {
@@ -21,7 +14,6 @@ export interface TaskGroups<T> {
   near: T[];
   week: T[];
   soon: T[];
-  waiting: WaitingGroup<T>[];
   decide: T[];
   ongoing: T[];
   /** Most recently done first. */
@@ -29,19 +21,10 @@ export interface TaskGroups<T> {
 }
 
 export function groupTasks<T extends GroupTask>(tasks: T[], now: DateTime, zone: string, homeZone: string): TaskGroups<T> {
-  const g: TaskGroups<T> = { overdue: [], near: [], week: [], soon: [], waiting: [], decide: [], ongoing: [], done: [] };
+  const g: TaskGroups<T> = { overdue: [], near: [], week: [], soon: [], decide: [], ongoing: [], done: [] };
   const sorted = [...tasks].sort((a, b) => compareByDeadline(a, b, homeZone) || a.sortOrder - b.sortOrder);
-  for (const t of sorted) {
-    const w = effectiveWindow(t, now, zone, homeZone);
-    if (w !== 'waiting') {
-      g[w].push(t);
-      continue;
-    }
-    const key = t.conditionId ?? null;
-    let group = g.waiting.find((x) => x.conditionId === key);
-    if (!group) g.waiting.push((group = { conditionId: key, tasks: [] }));
-    group.tasks.push(t);
-  }
+  // Tasks with a condition stay in their own window (spec §9): there's no Waiting group.
+  for (const t of sorted) g[effectiveWindow(t, now, zone, homeZone)].push(t);
   g.done.sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''));
   return g;
 }

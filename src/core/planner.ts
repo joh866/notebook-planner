@@ -124,6 +124,33 @@ export interface PlanTask {
   sometime: { date: string; rolledFrom: string | null } | null;
   /** It already has a block from now on (not counting blocks this plan lifts). */
   scheduled: boolean;
+  /** It has an "if" condition whose question isn't answered Yes yet (spec §10, "Conditions"). */
+  ifPending: boolean;
+  /** Its "after" condition, while the prerequisite isn't done. */
+  after: Prereq | null;
+}
+
+/** What an "after" item comes after (spec §10, "Conditions"). */
+export interface Prereq {
+  /** The prerequisite task, so placing it in the same plan counts. Null for an event. */
+  taskId: string | null;
+  /** Where its last block on the schedule ends, or null when it isn't on the schedule. */
+  ends: { date: string; min: number } | null;
+}
+
+/**
+ * The earliest an "after" item can start on a day: null when nothing holds it back, a minute when
+ * its prerequisite ends that day, "wait" while the prerequisite might still be placed in this plan,
+ * and "never" when the prerequisite isn't scheduled before that day ends.
+ */
+function afterGate(t: PlanTask, date: string, placed: Map<string, { date: string; min: number }>, pending: Set<string>): number | null | 'wait' | 'never' {
+  if (!t.after) return null;
+  const mine = t.after.taskId ? placed.get(t.after.taskId) : undefined;
+  const ends = [t.after.ends, mine].filter((x): x is { date: string; min: number } => !!x)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.min - b.min).at(-1);
+  if (!ends) return t.after.taskId && pending.has(t.after.taskId) ? 'wait' : 'never';
+  if (ends.date > date) return 'never';
+  return ends.date < date ? null : ends.min;
 }
 
 export interface PlanClock {
@@ -147,10 +174,10 @@ function dueOn(t: PlanTask, zone: string): { date: string; min: number | null } 
 
 /**
  * A task's score for a day (spec §12, "Scoring"), and the reason a block would show. Null when it's
- * never planned: done, waiting, a decision, or due before that day.
+ * never planned: done, an "if" item not answered Yes yet, a decision, or due before that day.
  */
 export function scoreTask(t: PlanTask, date: string, c: PlanClock): { score: number; reason: string } | null {
-  if (t.doneAt) return null;
+  if (t.doneAt || t.ifPending) return null;
   const w = effectiveWindow(t, c.now, c.zone, c.homeZone);
   let score = BASE[w];
   let reason = BASE_REASON[w];
@@ -190,11 +217,12 @@ export interface Placement {
 /**
  * Plans one day (spec §12, "Plan button"): scores every unfinished task that isn't scheduled and
  * places them, highest score first, into the day's free time, at most 6. `keep` holds the lengths
- * of penciled blocks the plan lifted, so a block you resized keeps its length.
+ * of penciled blocks the plan lifted, so a block you resized keeps its length. An "after" item
+ * waits for its prerequisite: it's placed after it, or not at all.
  */
 export function planDay(day: DayFree, tasks: PlanTask[], c: PlanClock, keep: Map<string, number> = new Map()): Placement[] {
   const busy = [...day.busy];
-  const candidates = tasks
+  const left = tasks
     .filter((t) => !t.scheduled && (!t.sometime || t.sometime.date === day.date))
     .flatMap((t) => {
       const s = scoreTask(t, day.date, c);
@@ -203,12 +231,20 @@ export function planDay(day: DayFree, tasks: PlanTask[], c: PlanClock, keep: Map
     .sort((a, b) => b.score - a.score);
 
   const out: Placement[] = [];
-  for (const { t, reason } of candidates) {
-    if (out.length >= MAX_PER_RUN) break;
+  const placed = new Map<string, { date: string; min: number }>();
+  while (out.length < MAX_PER_RUN) {
+    // The best-scoring task that isn't waiting on a prerequisite still to be placed.
+    const pending = new Set(left.map((x) => x.t.id));
+    const i = left.findIndex(({ t }) => afterGate(t, day.date, placed, pending) !== 'wait');
+    if (i < 0) break;
+    const { t, reason } = left.splice(i, 1)[0]!;
+    const gate = afterGate(t, day.date, placed, pending);
+    if (gate === 'never' || gate === 'wait') continue;
     const shape = lengthOf(t, keep.get(t.id));
-    const at = firstFit(day.from, limitOn(t, day.date, c, day.to), shape, busy);
+    const at = firstFit(Math.max(day.from, gate ?? -Infinity), limitOn(t, day.date, c, day.to), shape, busy);
     if (at == null) continue;
     busy.push(...shape.handsOn.map(([a, b]): Interval => [at + a, at + b]));
+    placed.set(t.id, { date: day.date, min: at + shape.minutes });
     out.push({ taskId: t.id, date: day.date, startMin: at, minutes: shape.minutes, reason, rolledFrom: t.sometime?.rolledFrom ?? null });
   }
   return out;
@@ -231,19 +267,30 @@ export function placeNew(tasks: PlanTask[], c: PlanClock, dayFree: (date: string
     return d;
   };
   const out: Placement[] = [];
-  for (const t of tasks) {
-    if (t.doneAt || t.scheduled) continue;
+  const placed = new Map<string, { date: string; min: number }>();
+  const left = tasks.filter((t) => {
+    if (t.doneAt || t.scheduled || t.ifPending) return false;
     const w = effectiveWindow(t, c.now, c.zone, c.homeZone);
-    if (w !== 'overdue' && w !== 'near' && w !== 'week') continue;
+    return w === 'overdue' || w === 'near' || w === 'week';
+  });
+  // An "after" item waits until its prerequisite has had its turn.
+  while (left.length) {
+    const pending = new Set(left.map((t) => t.id));
+    const i = left.findIndex((t) => !t.after?.taskId || !pending.has(t.after.taskId) || t.after.taskId === t.id);
+    const t = left.splice(i < 0 ? 0 : i, 1)[0]!;
+    const w = effectiveWindow(t, c.now, c.zone, c.homeZone);
     const due = dueOn(t, c.zone);
     const first = t.sometime?.date ?? c.today;
     const last = t.sometime?.date ?? (due && w !== 'overdue' ? due.date : addDays(c.today, w === 'week' ? 6 : 1));
     for (let date = first, n = 0; date <= last && n < AUTO_HORIZON; date = addDays(date, 1), n++) {
+      const gate = afterGate(t, date, placed, new Set());
+      if (gate === 'never' || gate === 'wait') continue;
       const day = get(date);
       const shape = lengthOf(t);
-      const at = firstFit(day.from, limitOn(t, date, c, day.to), shape, day.busy);
+      const at = firstFit(Math.max(day.from, gate ?? -Infinity), limitOn(t, date, c, day.to), shape, day.busy);
       if (at == null) continue;
       day.busy.push(...shape.handsOn.map(([a, b]): Interval => [at + a, at + b]));
+      placed.set(t.id, { date, min: at + shape.minutes });
       const reason = scoreTask(t, date, c)?.reason ?? BASE_REASON[w]!;
       out.push({ taskId: t.id, date, startMin: at, minutes: shape.minutes, reason, rolledFrom: t.sometime?.rolledFrom ?? null });
       break;

@@ -4,7 +4,7 @@ export const HealthSchema = z.object({ ok: z.literal(true) });
 export type Health = z.infer<typeof HealthSchema>;
 
 /** Where a task sits in the list (spec §9, §11). Overdue is derived, never stored. */
-export const WindowSchema = z.enum(['near', 'week', 'soon', 'ongoing', 'waiting', 'decide']);
+export const WindowSchema = z.enum(['near', 'week', 'soon', 'ongoing', 'decide']);
 export type Window = z.infer<typeof WindowSchema>;
 
 /** One-off blocks on the schedule (spec §7). */

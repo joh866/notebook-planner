@@ -56,9 +56,10 @@ describe('POST /api/drops', () => {
     expect(blocks(back).some((b) => b.taskId === 'quant')).toBe(false);
   });
 
-  it('won’t drop into the past on today, or put waiting and decision items on the schedule', async () => {
+  it('won’t drop into the past on today, or put decision items on the schedule', async () => {
     expect((await dropIt({ action: 'placeTask', taskId: 'quant', date: FRI, startMin: 600 })).status).toBe(409);
-    expect((await dropIt({ action: 'placeTask', taskId: 'gym', date: SAT, startMin: 600 })).status).toBe(409);
+    // An "if" item can go on the schedule; it asks "Still on?" when its time comes (spec v0.5).
+    expect((await dropIt({ action: 'placeTask', taskId: 'gym', date: SAT, startMin: 600 })).status).toBe(200);
     expect((await dropIt({ action: 'placeTask', taskId: 'blanket', date: SAT, startMin: 600 })).status).toBe(409);
     // A few minutes behind the server's clock is fine.
     expect((await dropIt({ action: 'placeTask', taskId: 'quant', date: FRI, startMin: 15 * 60 - 3 })).status).toBe(200);

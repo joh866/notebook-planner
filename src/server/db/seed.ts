@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { Db } from './client';
 import * as t from './schema';
@@ -56,9 +57,9 @@ const routineSlots: (typeof t.routineSlots.$inferInsert)[] = [
 ];
 
 const conditions: (typeof t.conditions.$inferInsert)[] = [
-  { id: 'cold', question: 'Is the cold fully gone?' },
-  { id: 'arch', question: 'Did you get into ARCH?' },
-  { id: 'qnet', question: 'Has the QNet certificate arrived?' },
+  { id: 'cold', question: 'Is the cold fully gone?', phrase: 'once the cold is fully gone' },
+  { id: 'arch', question: 'Did you get into ARCH?', phrase: 'if I get into ARCH' },
+  { id: 'qnet', question: 'Has the QNet certificate arrived?', phrase: 'once the QNet certificate arrives' },
 ];
 
 type TaskSeed = typeof t.tasks.$inferInsert & { steps?: string[] };
@@ -66,10 +67,10 @@ type TaskSeed = typeof t.tasks.$inferInsert & { steps?: string[] };
 const sosc = chicago('2026-10-06', '14:00');
 const tasks: TaskSeed[] = [
   { id: 'muqaddimah', title: 'Read The Muqaddimah', shortName: 'the Muqaddimah reading', meta: 'SOSC 16100', categoryId: 'class',
-    window: 'week', dueAt: sosc, estLow: 180, estHigh: 300, sittingMinutes: 75,
+    window: 'week', dueAt: sosc, estLow: 180, estHigh: 300, sittingMinutes: 75, afterTaskId: 'get-book',
     steps: ['Chapter 2', 'Chapter 3, sections 1–15', 'Chapter 6, sections 34–37'] },
   { id: 'response', title: 'Prep for the reading response', shortName: 'the reading response', meta: 'SOSC 16100, go over likely prompts',
-    categoryId: 'class', window: 'week', dueAt: sosc, estLow: 45, estHigh: 60 },
+    categoryId: 'class', window: 'week', dueAt: sosc, estLow: 45, estHigh: 60, afterTaskId: 'muqaddimah' },
   { id: 'get-book', title: 'Get The Muqaddimah', meta: 'SOSC 16100, needed before the reading', categoryId: 'class',
     window: 'week', estLow: 20, estHigh: 40 },
   { id: 'math-pset', title: 'Problem Set 1', shortName: 'Math PSet 1', meta: 'MATH 15910', categoryId: 'class', window: 'week',
@@ -84,12 +85,12 @@ const tasks: TaskSeed[] = [
   { id: 'quant', title: 'Consolidate the quant plan', meta: 'Or just start the stats course', categoryId: 'growth', window: 'near',
     estLow: 45, estHigh: 90 },
 
-  { id: 'gym', title: 'Gym', categoryId: 'life', window: 'waiting', conditionId: 'cold', estLow: 60, estHigh: 90 },
-  { id: 'boxing', title: 'Check out boxing club', categoryId: 'life', window: 'waiting', conditionId: 'cold' },
-  { id: 'arch-reading', title: 'ARCH reading and photo upload', categoryId: 'class', window: 'waiting', conditionId: 'arch',
+  { id: 'gym', title: 'Gym', categoryId: 'life', window: 'week', conditionId: 'cold', estLow: 60, estHigh: 90 },
+  { id: 'boxing', title: 'Check out boxing club', categoryId: 'life', window: 'week', conditionId: 'cold' },
+  { id: 'arch-reading', title: 'ARCH reading and photo upload', categoryId: 'class', window: 'week', conditionId: 'arch',
     estLow: 30, estHigh: 60 },
   { id: 'resume', title: 'Update resume, apply to internships', meta: 'Start with ones that skip the writing part',
-    categoryId: 'growth', window: 'waiting', conditionId: 'qnet' },
+    categoryId: 'growth', window: 'soon', conditionId: 'qnet' },
 
   { id: 'blanket', title: 'New blanket?', categoryId: 'errand', window: 'decide',
     decisionYes: { makeTask: { title: 'Get a new blanket', window: 'soon' } } },
@@ -123,6 +124,8 @@ export function seed(db: Db): boolean {
       .some((table) => tx.select().from(table).limit(1).all().length > 0);
     if (hasData) return false;
 
+    // "After" links point at tasks further down the list.
+    tx.run(sql`PRAGMA defer_foreign_keys = ON`);
     tx.insert(t.settings).values(defaultSettings).run();
     tx.insert(t.categories).values(categories).run();
     tx.insert(t.classes).values(classes).run();

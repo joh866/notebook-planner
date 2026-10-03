@@ -104,6 +104,8 @@ const TaskFields = z.strictObject({
   sittingMinutes: Minutes.nullish(),
   sessionMinutes: Minutes.nullish(),
   conditionId: Id.nullish(),
+  afterTaskId: Id.nullish(),
+  afterBlockId: Id.nullish(),
   decisionYes: DecisionYesSchema.nullish(),
   doneAt: InstantSchema.nullish(),
   durationFeedback: DurationFeedbackSchema.nullish(),
@@ -176,6 +178,9 @@ const BlockFields = z.strictObject({
   reason: Title.nullish(),
   rolledFrom: DaySchema.nullish(),
   done: z.boolean().optional(),
+  conditionId: Id.nullish(),
+  afterTaskId: Id.nullish(),
+  afterBlockId: Id.nullish(),
 });
 export const BlockInputSchema = BlockFields.superRefine(rule(blockProblem));
 export const BlockPatchSchema = BlockFields.partial();
@@ -188,13 +193,14 @@ export const CategoryPatchSchema = CategoryFields.partial();
 
 const ConditionFields = z.strictObject({
   question: Title,
+  phrase: Title.nullish(),
   snoozedUntil: DaySchema.nullish(),
   answeredAt: InstantSchema.nullish(),
 });
 export const ConditionInputSchema = ConditionFields;
 export const ConditionPatchSchema = ConditionFields.partial();
 
-/** Yes or No on a decision item (spec §10). */
+/** Yes or No on a decision item (spec §10), and on "Still on?" for a timed "if" item. */
 export const DecideInputSchema = z.strictObject({ yes: z.boolean() });
 
 /** A spot on a day's schedule, in wall-clock minutes after midnight (6am to 3am the next night). */
@@ -254,9 +260,14 @@ export interface DecisionResult {
   skipped: { classId: string; date: string } | null;
 }
 
-/** POST /api/conditions/:id/answer. The tasks that moved to Soon. */
+/** POST /api/conditions/:id/answer. The tasks and events whose condition Yes cleared. */
 export interface ConditionAnswer {
-  moved: { id: string; title: string }[];
+  cleared: { id: string; title: string }[];
+}
+
+/** POST /api/tasks/:id/still-on and /api/blocks/:id/still-on. Yes makes it a normal item; No removes it. */
+export interface StillOnResult {
+  removed: boolean;
 }
 
 /** POST /api/drops. `routine` is set for placeRoutine, so the message can say how it repeats. */
@@ -330,6 +341,8 @@ export interface TaskCard {
   sittingMinutes: number | null;
   sessionMinutes: number | null;
   conditionId: string | null;
+  /** Its "if" or "after" condition while it holds, shown in look C (spec §10, "Conditions"). */
+  condition: ConditionView | null;
   decisionYes: DecisionYes | null;
   doneAt: string | null;
   steps: StepView[];
@@ -337,11 +350,17 @@ export interface TaskCard {
   scheduled: { startAt: string } | { sometime: string } | null;
 }
 
-export interface WaitingGroupView {
-  condition: { id: string; question: string; snoozedUntil: string | null; answeredAt: string | null } | null;
-  /** False after "Not yet" until the snooze ends, or once answered. */
-  ask: boolean;
-  tasks: TaskCard[];
+/** A condition that still holds: an unanswered "if" question, or an "after" whose prerequisite isn't done. */
+export type ConditionView =
+  | { kind: 'if'; conditionId: string; question: string; text: string }
+  | { kind: 'after'; taskId: string | null; blockId: string | null; title: string; text: string };
+
+/** An unanswered check-in question for the strip at the top of the task panel (spec §9). */
+export interface CheckInView {
+  conditionId: string;
+  question: string;
+  /** What's waiting on it. */
+  titles: string[];
 }
 
 export interface TaskGroupsView {
@@ -349,7 +368,6 @@ export interface TaskGroupsView {
   near: TaskCard[];
   week: TaskCard[];
   soon: TaskCard[];
-  waiting: WaitingGroupView[];
   decide: TaskCard[];
   ongoing: TaskCard[];
   done: TaskCard[];
@@ -419,6 +437,10 @@ export interface BlockItem extends Placed {
   done: boolean;
   /** A task block whose time has passed today while it's unchecked. */
   missed: boolean;
+  /** Its condition (a task block's comes from its task), while it holds. */
+  condition: ConditionView | null;
+  /** A timed "if" item whose time has come: it asks "Still on?" (spec §7). */
+  askNow: boolean;
   /** Task blocks only. */
   steps: StepView[];
   nextStep: string | null;
@@ -482,6 +504,8 @@ interface ViewContext {
 
 export interface DayView extends ViewContext, DaySchedule {
   daily: DailyRow[];
+  /** Unanswered check-in questions, not snoozed (spec §9, "Check-ins"). */
+  checkIns: CheckInView[];
   groups: TaskGroupsView;
   header: {
     overdue: { taskId: string; name: string }[];

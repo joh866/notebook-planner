@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13b.
+Step 13c.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -80,7 +80,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
     - Between midnight and 4am, "today" means the calendar day that just started.
     - Test: at 12:47am, "2:30pm today" lands at 2:30pm that afternoon, not the previous one.
   - **The Sometime lane rule** (spec §7). Find out why items weren't showing up there. Then test each of the five sources: dragged in, "today" with no time, day-only deadlines due that day, rolled over, and events with no time.
-- [ ] **13b. Conditions: "if" and "after"** (spec §10).
+- [x] **13b. Conditions: "if" and "after"** (spec §10).
   - **Data:** a condition on any task or event. It's either a question (reusing the check-in questions) or another item.
   - **Migration:** the existing waiting tasks keep their questions and get windows, per spec §16. Add Read The Muqaddimah after Get The Muqaddimah, and Prep for the reading response after Read The Muqaddimah.
   - **Display:**
@@ -137,6 +137,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
 
 ## Backlog
 Ideas and annoyances from using the app. Add them here. Don't fix them in the middle of another step.
+- The planner could give a prerequisite the urgency of what waits on it. Today Get The Muqaddimah scores as a plain This week task, so on a full day Read The Muqaddimah (due Tuesday) may not fit after it until the next day's plan.
 - Temporary: `vite.config.ts` sets `server.host: '0.0.0.0'` so the phone can open the dev server on the same Wi-Fi (Mac's IP, port 5173). There's no sign-in, so anyone on that network can read and edit the planner. Remove it in step 14, once the app is online with a sign-in.
 
 ## Notes
@@ -160,3 +161,20 @@ Agents add short notes here when a step is done.
   - **Never in the past.** The add box knows the planner day and the calendar day (`calToday`, the next date between midnight and 4am). "Today" means `calToday`: the prompt says so after midnight, and the local guess reads text with it. `Adder.landing` handles two cases. A late-night time on the day that just started is tonight. An event time that has already passed today moves to its next occurrence. Deadline times only move after midnight. Also fixed: the local guess read "at 2:30pm" as a "Label: time" line. The Plan button and automatic scheduling already started at now plus 10 minutes. `server/never-past.test.ts` covers both, at 12:47am and in the evening.
   - **The Sometime lane.** Things went missing for three reasons. Day-only deadlines (like "Pick up new parcel") were never lane sources. Tasks typed as "today" only got a window. Things added after midnight went on the coming day's lane. `laneFor` in `views.ts` now adds unfinished and done day-only deadlines due that day (`due: true`: no ×, dragged like a card, and not shown twice in the week views). A task with a block on that day leaves the lane. Tasks get a `date` (today only, as in spec §7), which commits them to today's lane. `server/sometime.test.ts` tests all five sources.
   - The planner's +200 for committed tasks still counts only Sometime entries, not deadline chips.
+- Step 13b:
+  - **Data.** Migration `0003` (generated, then edited by hand so the new links say `ON DELETE set null`, which drizzle-kit left out of `ALTER TABLE`). It adds `conditions.phrase` ("if it's open"), `tasks.after_task_id` and `after_block_id`, and `blocks.condition_id`, `after_task_id`, and `after_block_id`. An "after" points at a task or an event. `0004_seed_v0_5.sql` is a guarded data migration. Waiting seed tasks get their §16 windows: Gym, boxing, and ARCH go to This week, the resume to Soon, and any other waiting task to Soon, where Yes used to send it. Questions already answered stop holding anything back. The seed questions get phrases. Read The Muqaddimah comes after Get The Muqaddimah, and Prep for the reading response comes after Read. `waiting` is no longer a window. Undo tracks the new links and defers foreign key checks while restoring, since links run both ways between tasks and blocks. The seed does the same.
+  - **Server.** Views give cards and blocks a `condition` (`if` with the question and phrase, or `after` with the prerequisite) while it holds. An event prerequisite counts as done once it's over or checked. Blocks also get `askNow`, for a timed "if" item whose start has passed. The day view's `checkIns` lists unanswered, unsnoozed questions that something unfinished still has. Yes on a check-in (`POST /api/conditions/:id/answer`, now `{ cleared }`) clears the condition from every task and event. `POST /api/tasks/:id/still-on` and `/api/blocks/:id/still-on` (`{ yes }`): Yes clears that item's condition, and answers the question once nothing else unfinished has it. No deletes the item. Each has one Undo. "If" items can be dropped on the schedule now; decisions still can't.
+  - **Add box.** It reads `if` (the phrase), `ask` (the question; the old `wait` still works), and `after` (an id, or a title matched among the items just added, then unfinished tasks and events). It reuses an open question with the same words.
+  - **Planner.** `ifPending` items are never planned. An "after" item waits for its prerequisite in the same plan, and both the Plan button and automatic scheduling go in that order. It's placed after the prerequisite's last block that day, any time on a later day, and never on a day before it. With an unscheduled prerequisite, it isn't placed at all.
+  - **Web.** The Check-ins strip sits at the top of the task panel, and the Waiting group is gone. Look C (`.conditional`: faded, striped, dashed left edge, condition text) is on cards and blocks. "Still on? Yes / No" appears on the block and in its popover.
+  - **Tests rewritten for spec v0.5** (approved, AGENTS.md rule 4):
+    - `localParse.test` "makes ? items decisions, and contingent ones waiting": now `if` and `ask` in their own windows.
+    - `groups.test` "groups waiting tasks under their check-in question": now they stay in their windows.
+    - `urgency.test` "leaves waiting and decision items where they are": decision items only.
+    - `planner.test` "never plans waiting…": now `ifPending`.
+    - In `app.test`: the day view's Waiting group became `checkIns` plus windows; "hides a check-in question after Not yet" now uses `checkIns`; "Yes on a check-in moves every task to Soon" now clears the condition, and they stay in their windows.
+    - `adds.test`: "Try climbing" with an old `waiting` reply lands in Soon with the question.
+    - `drops.test`: Gym (an "if" item) can be dropped on the schedule now.
+    - `plan.test`: "pencils tasks into today's free time" no longer places Read before Get (Get and the Shopping run fill the end of the day). "Re-plans the same way" now resizes Problem Set 1, and the room it frees goes to Read, after Get.
+  - New tests: the planner can't place Read before Get (`planner.test`), `server/conditions.test.ts`, and a v0.5 migration test with data like the real database's.
+

@@ -43,19 +43,18 @@ describe('groupTasks', () => {
     expect(g.week.map((t) => t.id)).toEqual(['timed', 'dayOnly', 'a', 'b']);
   });
 
-  it('groups waiting tasks under their check-in question', () => {
+  it('keeps tasks with a condition in their own window (there is no Waiting group)', () => {
     const g = groupTasks(
       [
-        task('gym', { window: 'waiting', conditionId: 'cold', sortOrder: 0 }),
-        task('arch', { window: 'waiting', conditionId: 'arch', sortOrder: 1 }),
-        task('boxing', { window: 'waiting', conditionId: 'cold', sortOrder: 2 }),
+        task('gym', { window: 'week', sortOrder: 0 }),
+        task('arch', { window: 'week', sortOrder: 1 }),
+        task('resume', { window: 'soon', sortOrder: 2 }),
       ],
       now, CHI, CHI,
     );
-    expect(g.waiting).toEqual([
-      { conditionId: 'cold', tasks: [expect.objectContaining({ id: 'gym' }), expect.objectContaining({ id: 'boxing' })] },
-      { conditionId: 'arch', tasks: [expect.objectContaining({ id: 'arch' })] },
-    ]);
+    expect(g.week.map((t) => t.id)).toEqual(['gym', 'arch']);
+    expect(g.soon.map((t) => t.id)).toEqual(['resume']);
+    expect(Object.keys(g)).not.toContain('waiting');
   });
 
   it('lists the most recently done first', () => {

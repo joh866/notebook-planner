@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray, getTableColumns, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Db } from './db/client';
 import * as t from './db/schema';
@@ -40,6 +40,11 @@ const REFS: { child: TableName; column: string; parent: TableName; cascade: bool
   { child: 'classes', column: 'categoryId', parent: 'categories', cascade: false },
   { child: 'blocks', column: 'categoryId', parent: 'categories', cascade: false },
   { child: 'tasks', column: 'conditionId', parent: 'conditions', cascade: false },
+  { child: 'blocks', column: 'conditionId', parent: 'conditions', cascade: false },
+  { child: 'tasks', column: 'afterTaskId', parent: 'tasks', cascade: false },
+  { child: 'tasks', column: 'afterBlockId', parent: 'blocks', cascade: false },
+  { child: 'blocks', column: 'afterTaskId', parent: 'tasks', cascade: false },
+  { child: 'blocks', column: 'afterBlockId', parent: 'blocks', cascade: false },
   { child: 'taskSteps', column: 'taskId', parent: 'tasks', cascade: true },
   { child: 'blocks', column: 'taskId', parent: 'tasks', cascade: true },
   { child: 'sometime', column: 'taskId', parent: 'tasks', cascade: true },
@@ -118,6 +123,8 @@ export class Change implements UndoEntry {
 
 /** Puts the database back the way it was before a change. */
 export function applyUndo(tx: Tx, entry: UndoEntry) {
+  // "After" links can point either way between tasks and blocks, so check them at commit.
+  tx.run(sql`PRAGMA defer_foreign_keys = ON`);
   for (const name of [...ORDER].reverse()) {
     for (const row of entry.remove.get(name)?.values() ?? []) tx.delete(tableOf(name)).where(whereKey(name, row)).run();
   }

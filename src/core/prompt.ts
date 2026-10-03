@@ -45,7 +45,7 @@ Fields:
 - title: short. Tasks start with a verb ("Get razor"). Keep names and course codes as written.
 - meta: one short line of extra detail.
 - cat: "class" (schoolwork), "errand" (buying, fixing, admin), "growth" (skills, projects, career), "life" (health, social, chores), "routine"${custom}. If the line has a #tag, use the tag word as cat, even if it's new.
-- win (tasks): "near" = today or tomorrow, "week" = within about a week, "soon" = no rush, "ongoing" = open-ended skill building, "waiting" = depends on something that hasn't happened, "decide" = has "?", "maybe", "not sure", or needs a judgment call.
+- win (tasks): "near" = today or tomorrow, "week" = within about a week, "soon" = no rush, "ongoing" = open-ended skill building, "decide" = has "?", "maybe", "not sure", or needs a judgment call. Something that depends on a condition still gets its normal win, plus "if".
 - due (tasks): {"date":"YYYY-MM-DD","time":"HH:MM"}, only if they gave a deadline. "before class" means that class's start time on that day. Leave out time if none was given.
 - date (tasks): today's date, when a task is for today but has no time and no deadline ("call mom today"). It goes on today's list.
 - short: a 2-4 word name for a deadline that says what the work is ("Math PSet 2"), never a class's name.
@@ -53,7 +53,9 @@ Fields:
 - sitting: minutes for one work session when the task is big.
 - session: minutes per session for ongoing skill items.
 - steps: the parts of a task, when it clearly has separate parts. Each is a string, or {"title":"...","minutes":N,"waiting":true} when the length is known. "waiting" means the step mostly runs by itself (a wash cycle, an oven timer); leave it out for hands-on steps.
-- wait: for waiting tasks, the condition as a yes/no question ("Is the cold fully gone?").
+- if (tasks, events): a condition, as written, to show under the title ("if it's open", "once the cold is fully gone", "if I get into ARCH").
+- ask: with "if", the yes/no check-in question for it ("Is it open?", "Is the cold fully gone?").
+- after (tasks, events): the title of the item this comes after, when they say so ("after getting the book", "read it once I have it"). Use that item's title as you wrote it in this reply, or the name of the existing item they mean.
 - repeat (routines, classes): {"days":"daily"} or {"days":[0-6],"every":1 or 2}. 0 is Sunday. "Biweekly" and "every other week" are "every":2.
 - date (events): "YYYY-MM-DD". start, end: "HH:MM" 24-hour, only if given.
 - kind (classes): "Lecture", "Discussion", "Seminar", "Lab", and so on.

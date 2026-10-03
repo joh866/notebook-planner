@@ -202,22 +202,25 @@ export function localParse(text: string, today: string): ParsedItem[] {
     }
     if (ctx.course) item.meta = ctx.course;
 
+    // An "if" condition (spec §10, "Conditions"): the item keeps its window and gets a check-in question.
+    if (/\b(contingent|depends on)\b/.test(remarks) || /\bonce\b/i.test(main)) {
+      const cond = /\b(if|once|when)\b\s+([^,;?]+?)(?=\s+and\s|[,;?]|$)/i.exec(main);
+      const phrase = cond ? tidy(`${cond[1]} ${cond[2]}`) : null;
+      item.if = phrase ? phrase.charAt(0).toLowerCase() + phrase.slice(1) : 'if it happens';
+      item.ask = phrase ? `${cap(phrase)}?` : 'Has it happened yet?';
+      if (cond) main = tidy(main.replace(cond[0], ''));
+    }
+
     // The window, from the remarks and the deadline.
-    if (/\b(contingent|depends on)\b/.test(remarks) || /\bonce\b/i.test(main)) item.win = 'waiting';
-    else if (/\?/.test(main)) item.win = 'decide';
+    if (/\?/.test(main) && !item.if) item.win = 'decide';
     else if (/\bnear near future\b|\btoday\b|\btomorrow\b|\btonight\b/.test(all)) item.win = 'near';
     else if (/\bnear future\b|\bthis week\b|\babout a week\b/.test(all)) item.win = 'week';
     else if (/\b(skill|ongoing|no end)\b/.test(all)) item.win = 'ongoing';
     else if (item.due) item.win = windowFor(today, item.due.date);
     else item.win = 'soon';
 
-    if (item.win === 'waiting') {
-      const cond = /\b(if|once|when)\b\s+([^,;?]+?)(?=\s+and\s|[,;?]|$)/i.exec(main);
-      item.wait = cond ? `${cap(tidy(`${cond[1]} ${cond[2]}`))}?` : 'Has it happened yet?';
-      if (cond) main = tidy(main.replace(cond[0], ''));
-    }
     // A task for today, with no time, goes in today's Sometime lane (spec §7).
-    if (!item.due && item.win !== 'waiting' && item.win !== 'decide' && /\b(today|tonight)\b(?![’'])/i.test(main)) item.date = today;
+    if (!item.due && !item.if && item.win !== 'decide' && /\b(today|tonight)\b(?![’'])/i.test(main)) item.date = today;
     main = tidy(main.replace(/\b(this week|today|tomorrow|tonight)\b(?![’'])/i, ''));
 
     const tag = /#([\w-]+)/.exec(main);

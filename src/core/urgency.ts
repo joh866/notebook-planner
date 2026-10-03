@@ -52,11 +52,11 @@ export function daysLeft(d: Deadline, today: string, zone: string): number | nul
 /**
  * The group a task shows in (spec §10, "Urgency rises"). More than 6 days away it stays in its
  * own window; 2–6 days moves it up to This week; today or tomorrow moves it to Today or tomorrow;
- * past the deadline it's Overdue. Waiting and decision items stay where they are.
+ * past the deadline it's Overdue. Decision items stay where they are.
  */
 export function effectiveWindow(t: UrgencyTask, now: DateTime, zone: string, homeZone: string): EffectiveWindow {
   if (t.doneAt) return 'done';
-  if (t.window === 'waiting' || t.window === 'decide') return t.window;
+  if (t.window === 'decide') return t.window;
   if (isOverdue(t, now, homeZone)) return 'overdue';
   const n = daysLeft(t, dayOf(now, zone), zone);
   if (n == null) return t.window;

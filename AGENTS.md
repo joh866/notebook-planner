@@ -49,7 +49,7 @@ TypeScript · React + Vite · plain CSS with variables (no Tailwind) · Hono on 
 1. Work only on the current step in PROGRESS.md.
 2. Before editing, give a short plan: files you'll touch, any new dependency, any schema change.
 3. No unrelated refactors.
-4. Never change an existing test's expected result to make it pass. Stop and explain instead.
+4. Never change an existing test's expected result to make it pass. Stop and explain instead. The one exception: when the spec deliberately replaces exactly what a test checks, rewrite that test to the new behavior, keep its intent where it still applies, and list every changed test in that step's PROGRESS notes. Any other failing test still means stop and ask.
 5. Never delete or overwrite `data/planner.db`. Tests use an in-memory database.
 6. If a request conflicts with PRODUCT_SPEC.md, stop and ask. When the user decides something new, update the spec in the same step and add a line to its change log.
 7. The UI must work at phone width (390px) and at desktop widths.

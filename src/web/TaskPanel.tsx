@@ -49,7 +49,6 @@ const GROUPS = [
   ['near', 'Today or tomorrow'],
   ['week', 'This week'],
   ['soon', 'Soon'],
-  ['waiting', 'Waiting on something'],
   ['decide', 'Needs a decision'],
   ['ongoing', 'Ongoing'],
 ] as const;
@@ -86,37 +85,21 @@ export function TaskPanel({ day, categories, filter, showDone, openId, onFilter,
           ))}
         </div>
 
+        {day.checkIns.length > 0 && (
+          <div className="checkins" aria-label="Check-ins">
+            {day.checkIns.map((c) => (
+              <div key={c.conditionId} className="checkin" title={`For ${c.titles.join(', ')}`}>
+                <b>{c.question}</b>
+                <button className="pill" onClick={() => actions.answer(c.conditionId)}>Yes</button>
+                <button className="pill" onClick={() => actions.notYet(c.conditionId)}>Not yet</button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <Daily rows={day.daily} onCheck={actions.checkRoutine} onDelete={actions.deleteRoutine} begin={drag.begin} />
 
         {GROUPS.map(([key, label]) => {
-          if (key === 'waiting') {
-            const groups = day.groups.waiting.map((w) => ({ ...w, tasks: w.tasks.filter(pass) })).filter((w) => w.tasks.length);
-            const n = groups.reduce((sum, w) => sum + w.tasks.length, 0);
-            if (!n) return null;
-            return (
-              <div key={key}>
-                <GroupHead label={label} count={n} />
-                {groups.map((w) => (
-                  <div key={w.condition?.id ?? 'none'}>
-                    {w.condition && (
-                      <div className="cond">
-                        <span className="cq">{w.condition.question}</span>
-                        {w.ask ? (
-                          <>
-                            <button className="pill" onClick={() => actions.answer(w.condition!.id)}>Yes</button>
-                            <button className="pill" onClick={() => actions.notYet(w.condition!.id)}>Not yet</button>
-                          </>
-                        ) : (
-                          <span className="snz">Asking again tomorrow</span>
-                        )}
-                      </div>
-                    )}
-                    {w.tasks.map(card)}
-                  </div>
-                ))}
-              </div>
-            );
-          }
           const list = day.groups[key].filter(pass);
           if (!list.length) return null;
           return (
@@ -154,8 +137,7 @@ function heightsFor(panel: HTMLElement) {
 
 /** Tap to open halfway or close. Drag to resize; it snaps to closed, half, or full. */
 function DrawerHandle({ day, stop, onStop }: { day: DayView; stop: DrawerStop; onStop: (s: DrawerStop) => void }) {
-  const open = (['overdue', 'near', 'week', 'soon', 'decide', 'ongoing'] as const).reduce((n, k) => n + day.groups[k].length, 0)
-    + day.groups.waiting.reduce((n, w) => n + w.tasks.length, 0);
+  const open = (['overdue', 'near', 'week', 'soon', 'decide', 'ongoing'] as const).reduce((n, k) => n + day.groups[k].length, 0);
 
   // Sizes the panel for its stop, and again when the window changes size.
   const ref = useRef<HTMLDivElement>(null);
@@ -385,9 +367,9 @@ function AddBox({ onAdd }: { onAdd: (text: string) => Promise<boolean> }) {
 function Card({ t, day, categories, open, fresh, onToggle, actions, begin }: CardProps) {
   const decide = t.window === 'decide';
   const overdue = t.effectiveWindow === 'overdue';
-  // Waiting and decision items, and finished tasks, don't go on the schedule.
-  const canDrag = !decide && t.window !== 'waiting' && !t.doneAt;
-  const cls = ['card', t.window === 'waiting' && 'waiting', t.doneAt && 'done', overdue && 'overdue', open && 'open', !canDrag && 'static', fresh && 'fresh']
+  // Decision items and finished tasks don't go on the schedule.
+  const canDrag = !decide && !t.doneAt;
+  const cls = ['card', t.condition && 'conditional', t.doneAt && 'done', overdue && 'overdue', open && 'open', !canDrag && 'static', fresh && 'fresh']
     .filter(Boolean).join(' ');
   const due = deadlineOn(t, day.zone);
   const { when, rest } = detailBits(t, day);
@@ -416,6 +398,7 @@ function Card({ t, day, categories, open, fresh, onToggle, actions, begin }: Car
           <button className="catdot" title={cat} aria-label={`Category: ${cat}. Change it`} onClick={(e) => actions.pickCategory(t, e.currentTarget)} />
           {t.title}
         </div>
+        {t.condition && <div className="m cond">{t.condition.text}</div>}
         {t.meta && <div className="m">{t.meta}</div>}
         {(when || rest.length > 0) && (
           <div className="e">

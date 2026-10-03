@@ -22,6 +22,20 @@
       "when": 1790918493961,
       "tag": "0002_seed_v0_4",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791042714072,
+      "tag": "0003_conditions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791042745778,
+      "tag": "0004_seed_v0_5",
+      "breakpoints": true
     }
   ]
 }

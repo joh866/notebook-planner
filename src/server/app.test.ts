@@ -55,11 +55,15 @@ describe('GET /api/day', () => {
     expect(ids(day.groups.near)).toEqual(['container', 'quant']);
     expect(ids(day.groups.week).slice(0, 4)).toEqual(['muqaddimah', 'response', 'math-pset', 'econ-pset']);
     expect(day.groups.week[0]).toMatchObject({ dueTone: 'soon', effectiveWindow: 'week' });
-    expect(day.groups.waiting.map((w) => [w.condition?.id, ids(w.tasks), w.ask])).toEqual([
-      ['cold', ['gym', 'boxing'], true],
-      ['arch', ['arch-reading'], true],
-      ['qnet', ['resume'], true],
+    // Tasks with a condition stay in their own windows, and their questions are check-ins (spec v0.5).
+    expect(day.checkIns.map((c) => [c.conditionId, c.titles])).toEqual([
+      ['cold', ['Gym', 'Check out boxing club']],
+      ['arch', ['ARCH reading and photo upload']],
+      ['qnet', ['Update resume, apply to internships']],
     ]);
+    expect(ids(day.groups.week)).toEqual(expect.arrayContaining(['gym', 'boxing', 'arch-reading']));
+    expect(ids(day.groups.soon)).toContain('resume');
+    expect(day.groups.week.find((x) => x.id === 'gym')?.condition).toMatchObject({ kind: 'if', text: 'once the cold is fully gone' });
     expect(ids(day.groups.decide)).toEqual(['blanket', 'topper', 'skip-disc', 'epiphany-build']);
     expect(ids(day.groups.ongoing)).toEqual(['number-theory']);
     expect(day.header).toEqual({
@@ -416,10 +420,10 @@ describe('categories, check-ins, and settings', () => {
   it('hides a check-in question after Not yet until the snooze ends', async () => {
     await call('PATCH', '/api/conditions/cold', { snoozedUntil: '2026-10-03' });
     const fri = await get<DayView>('/api/day');
-    expect(fri.groups.waiting.find((w) => w.condition?.id === 'cold')?.ask).toBe(false);
+    expect(fri.checkIns.find((c) => c.conditionId === 'cold')).toBeUndefined();
     clock = DateTime.fromISO('2026-10-03T09:00', { zone: CHI });
     const sat = await get<DayView>('/api/day');
-    expect(sat.groups.waiting.find((w) => w.condition?.id === 'cold')?.ask).toBe(true);
+    expect(sat.checkIns.find((c) => c.conditionId === 'cold')).toBeDefined();
   });
 
   it('updates settings and merges notifications', async () => {
@@ -505,18 +509,19 @@ describe('decisions and check-ins', () => {
     expect((await call('POST', '/api/tasks/blanket/decide', {})).status).toBe(400);
   });
 
-  it('Yes on a check-in moves every task under it to Soon, and Undo puts them back', async () => {
-    const res = await call<{ item: { moved: { id: string }[] }; undo: string }>('POST', '/api/conditions/cold/answer');
-    expect(ids(res.body.item.moved)).toEqual(['gym', 'boxing']);
+  it('Yes on a check-in clears the condition from every task with it, and Undo puts it back', async () => {
+    const res = await call<{ item: { cleared: { id: string }[] }; undo: string }>('POST', '/api/conditions/cold/answer');
+    expect(ids(res.body.item.cleared)).toEqual(['gym', 'boxing']);
     const day = await get<DayView>('/api/day');
-    expect(ids(day.groups.soon)).toEqual(expect.arrayContaining(['gym', 'boxing']));
-    expect(day.groups.waiting.find((w) => w.condition?.id === 'cold')).toBeUndefined();
+    // They stay in their own window, now as normal tasks.
+    expect(day.groups.week.filter((x) => ['gym', 'boxing'].includes(x.id)).map((x) => x.condition)).toEqual([null, null]);
+    expect(day.checkIns.find((c) => c.conditionId === 'cold')).toBeUndefined();
     expect((await get<{ answeredAt: string }>('/api/conditions/cold')).answeredAt).toBe('2026-10-02T20:00:00Z');
 
     await undo(res.body.undo);
     const after = await get<DayView>('/api/day');
-    expect(after.groups.waiting.find((w) => w.condition?.id === 'cold')).toMatchObject({ ask: true });
-    expect(ids(after.groups.soon)).not.toContain('gym');
+    expect(after.checkIns.find((c) => c.conditionId === 'cold')).toBeDefined();
+    expect(after.groups.week.find((x) => x.id === 'gym')?.condition).toMatchObject({ kind: 'if', conditionId: 'cold' });
     expect((await call('POST', '/api/conditions/nope/answer')).status).toBe(404);
   });
 

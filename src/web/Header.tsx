@@ -50,7 +50,7 @@ export function todayOnScreen(view: View, date: string, today: string, weekStart
 }
 
 export const allCards = (g: DayView['groups']): TaskCard[] =>
-  [...g.overdue, ...g.near, ...g.week, ...g.soon, ...g.waiting.flatMap((w) => w.tasks), ...g.decide, ...g.ongoing, ...g.done];
+  [...g.overdue, ...g.near, ...g.week, ...g.soon, ...g.decide, ...g.ongoing, ...g.done];
 
 /** "Math PSet 1, tomorrow at 11am." Tasks due at the same moment are named together. */
 function nextDeadlineText(day: DayView): string | null {

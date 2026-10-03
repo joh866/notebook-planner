@@ -3,7 +3,7 @@ import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
 import { deadlineName } from '../core/classes';
 import { blockLength } from '../core/length';
-import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask } from '../core/planner';
+import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask, type Prereq } from '../core/planner';
 import { classesOn, routineOccursOn, slotOn } from '../core/recurrence';
 import { streak } from '../core/streak';
 import { clockOnDay, minutesOnDay, parseClock, resolveZone } from '../core/time';
@@ -11,7 +11,9 @@ import { deadlineDay, deadlineMoment, dueTone, effectiveWindow, isOverdue } from
 import type {
   AgendaView,
   BlockItem,
+  CheckInView,
   ClassItem,
+  ConditionView,
   DailyRow,
   DaySchedule,
   DayView,
@@ -134,6 +136,34 @@ function routineItems(ctx: Ctx, date: string): RoutineItem[] {
   return out;
 }
 
+type Conditioned = { conditionId: string | null; afterTaskId: string | null; afterBlockId: string | null };
+const blockEnd = (b: Rows<typeof t.blocks>[number]) => utc(b.startAt).plus({ minutes: b.durationMinutes });
+
+/** An unanswered "if" question (one answered Yes doesn't hold anything back). */
+function openQuestion(ctx: Ctx, conditionId: string | null) {
+  const q = conditionId ? ctx.data.conditions.find((x) => x.id === conditionId) : undefined;
+  return q && !q.answeredAt ? q : null;
+}
+
+/** The prerequisite of an "after" item, while it isn't done. An event is done once it's over or checked. */
+function prerequisite(ctx: Ctx, c: Conditioned) {
+  const task = c.afterTaskId ? ctx.data.tasks.find((x) => x.id === c.afterTaskId) : undefined;
+  if (task && !task.doneAt) return { task, block: null };
+  const block = c.afterBlockId ? ctx.data.blocks.find((x) => x.id === c.afterBlockId) : undefined;
+  if (block && !block.done && blockEnd(block) > ctx.now) return { task: null, block };
+  return null;
+}
+
+/** The condition that still holds on a task or event, for look C (spec §10, "Conditions"). */
+function conditionOf(ctx: Ctx, c: Conditioned): ConditionView | null {
+  const q = openQuestion(ctx, c.conditionId);
+  if (q) return { kind: 'if', conditionId: q.id, question: q.question, text: q.phrase ?? q.question };
+  const pre = prerequisite(ctx, c);
+  if (!pre) return null;
+  const title = pre.task?.title ?? pre.block?.title ?? (pre.block?.taskId ? ctx.data.tasks.find((x) => x.id === pre.block!.taskId)?.title : null) ?? 'it';
+  return { kind: 'after', taskId: pre.task?.id ?? null, blockId: pre.block?.id ?? null, title, text: `after ${title}` };
+}
+
 function blockItem(ctx: Ctx, b: Rows<typeof t.blocks>[number], date: string): BlockItem {
   const task = b.taskId ? ctx.data.tasks.find((x) => x.id === b.taskId) : undefined;
   const steps = task ? stepsOf(ctx, task.id) : [];
@@ -141,12 +171,14 @@ function blockItem(ctx: Ctx, b: Rows<typeof t.blocks>[number], date: string): Bl
   const startMin = minutesOnDay(start, date, ctx.zone);
   const done = task ? !!task.doneAt : b.done;
   const ended = start.plus({ minutes: b.durationMinutes }) <= ctx.now;
+  const condition = conditionOf(ctx, task ?? b);
   return {
     type: 'block', id: b.id, kind: b.kind, title: task?.title ?? b.title, categoryId: b.categoryId ?? task?.categoryId ?? null,
     taskId: b.taskId, startAt: b.startAt, startMin, endMin: startMin + b.durationMinutes, durationMinutes: b.durationMinutes,
     tentative: b.tentative, label: b.label, location: b.location, pinned: b.pinned, reason: b.reason, rolledFrom: b.rolledFrom,
     done, missed: b.kind === 'task' && !done && ended && date === ctx.today,
     steps, nextStep: steps.find((s) => !s.done)?.title ?? null,
+    condition, askNow: condition?.kind === 'if' && !done && start <= ctx.now,
   };
 }
 
@@ -219,10 +251,24 @@ function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number]): TaskCard {
     effectiveWindow: effectiveWindow(task, ctx.now, ctx.zone, ctx.homeZone),
     dueAt: task.dueAt, dueDate: task.dueDate, dueTone: dueTone(task, ctx.now, ctx.zone, ctx.homeZone),
     shortName: task.shortName, estLow: task.estLow, estHigh: task.estHigh, sittingMinutes: task.sittingMinutes,
-    sessionMinutes: task.sessionMinutes, conditionId: task.conditionId, decisionYes: task.decisionYes ?? null, doneAt: task.doneAt,
+    sessionMinutes: task.sessionMinutes, conditionId: task.conditionId, condition: task.doneAt ? null : conditionOf(ctx, task), decisionYes: task.decisionYes ?? null, doneAt: task.doneAt,
     steps: stepsOf(ctx, task.id),
     scheduled: block ? { startAt: block.startAt } : some && some.date >= ctx.today ? { sometime: some.date } : null,
   };
+}
+
+/** Unanswered check-in questions that something still waits on, unless snoozed (spec §9, "Check-ins"). */
+function checkIns(ctx: Ctx): CheckInView[] {
+  return ctx.data.conditions
+    .filter((q) => !q.answeredAt && (!q.snoozedUntil || q.snoozedUntil <= ctx.today))
+    .map((q) => ({
+      conditionId: q.id, question: q.question,
+      titles: [
+        ...ctx.data.tasks.filter((x) => x.conditionId === q.id && !x.doneAt).map((x) => x.title),
+        ...ctx.data.blocks.filter((b) => b.conditionId === q.id && !b.done && blockEnd(b) > ctx.now).map((b) => b.title ?? 'Event'),
+      ],
+    }))
+    .filter((c) => c.titles.length);
 }
 
 /** Wall-clock minutes on a day for a local "HH:mm": before 4am is that day's night. */
@@ -254,8 +300,21 @@ function planning(ctx: Ctx) {
       doneAt: task.doneAt, steps: stepsOf(ctx, task.id),
       sometime: some ? { date: some.date, rolledFrom: some.rolledFrom } : null,
       scheduled: ctx.data.blocks.some((b) => b.taskId === task.id && !skip.has(b.id) && ends(b) > ctx.now),
+      ifPending: !!openQuestion(ctx, task.conditionId),
+      after: prereqOf(task, skip),
     };
   });
+
+  /** Where an "after" item's prerequisite ends on the schedule. Blocks in `skip` are being lifted. */
+  const prereqOf = (task: Rows<typeof t.tasks>[number], skip: Set<string>): Prereq | null => {
+    const pre = prerequisite(ctx, task);
+    if (!pre) return null;
+    const placed = pre.block ? [pre.block] : ctx.data.blocks.filter((b) => b.taskId === pre.task!.id && !skip.has(b.id));
+    const last = placed.sort((a, b) => ends(a).toMillis() - ends(b).toMillis()).at(-1);
+    if (!last) return { taskId: pre.task?.id ?? null, ends: null };
+    const date = dayOf(utc(last.startAt), ctx.zone);
+    return { taskId: pre.task?.id ?? null, ends: { date, min: minutesOnDay(utc(last.startAt), date, ctx.zone) + last.durationMinutes } };
+  };
 
   /** Minutes already on the schedule for each task from now on: time set aside for it. */
   const setAside = () => {
@@ -290,16 +349,9 @@ export function dayView(db: Db, now: DateTime, date: string | undefined, deviceZ
     zone: ctx.zone, homeZone: ctx.homeZone, now: iso(now), today: ctx.today,
     ...scheduleFor(ctx, day),
     daily: dailyRows(ctx, day),
+    checkIns: checkIns(ctx),
     groups: {
       overdue: toCards(g.overdue), near: toCards(g.near), week: toCards(g.week), soon: toCards(g.soon),
-      waiting: g.waiting.map((w) => {
-        const c = ctx.data.conditions.find((x) => x.id === w.conditionId);
-        return {
-          condition: c ? { id: c.id, question: c.question, snoozedUntil: c.snoozedUntil, answeredAt: c.answeredAt } : null,
-          ask: !!c && !c.answeredAt && (!c.snoozedUntil || c.snoozedUntil <= ctx.today),
-          tasks: toCards(w.tasks),
-        };
-      }),
       decide: toCards(g.decide), ongoing: toCards(g.ongoing), done: toCards(g.done),
     },
     header: {

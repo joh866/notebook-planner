@@ -77,8 +77,8 @@ function drop(tx: Tx, change: Change, d: DropInput, ctx: Ctx): DropResult {
   switch (d.action) {
     case 'placeTask': {
       const task = need(tx, 'tasks', d.taskId, 'task');
-      if (task.window === 'waiting' || task.window === 'decide') {
-        throw new HTTPException(409, { message: 'Waiting and decision items can’t go on the schedule' });
+      if (task.window === 'decide') {
+        throw new HTTPException(409, { message: 'Decision items can’t go on the schedule' });
       }
       const startAt = startOn(ctx, d.date, d.startMin);
       const some = findRows(tx, 'sometime', whereKey('sometime', { taskId: task.id }))[0];

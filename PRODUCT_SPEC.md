@@ -472,7 +472,7 @@ The AI returns JSON. Fields are left out when they don't apply.
 - **date, start, end:** for events and classes. A task meant for today with no time gets today's date, which puts it in the Sometime lane.
 - **loc:** the location.
 - **tentative:** for approximate times.
-- **if:** a condition question. **after:** the item it comes after, given as an existing id or the title of another item in the same text.
+- **if:** a condition, as it reads under the title ("if it's open"), with **ask:** its yes/no check-in question ("Is it open?"). **after:** the item it comes after, given as an existing id or the title of another item in the same text.
 - **quick:** true for tasks of about 15 minutes or less.
 - **Changes to existing items:** returned separately, each with an action (done, delete, update, move, check step, or log time), the id of an existing item, and the changed fields. Logged time comes as a start and a length.
 

@@ -39,29 +39,34 @@ describe('POST /api/plan', () => {
   it('pencils tasks into today’s free time after now, with reasons (spec §12)', async () => {
     const { status, body } = await plan('2026-10-02');
     expect(status).toBe(200);
+    // Read The Muqaddimah comes after Get The Muqaddimah (spec v0.5), and there's no room left after it today.
     expect(body.item.placed.map((p) => [p.title, local(p.startAt), p.reason])).toEqual([
-      ['Read The Muqaddimah', '16:15', 'Due Tue 2pm'],
-      ['Problem Set 1', '17:45', 'Due Wed 11am'],
-      ['Clean the wooden container, store folders', '19:30', 'Today or tomorrow'],
-      ['Consolidate the quant plan', '20:00', 'Today or tomorrow'],
-      ['Problem Set 1', '21:00', 'Due Oct 9, 12pm'],
+      ['Problem Set 1', '16:15', 'Due Wed 11am'],
+      ['Clean the wooden container, store folders', '18:00', 'Today or tomorrow'],
+      ['Consolidate the quant plan', '18:30', 'Today or tomorrow'],
+      ['Problem Set 1', '19:30', 'Due Oct 9, 12pm'],
+      ['Get The Muqaddimah', '21:15', 'This week'],
+      ['Shopping run', '21:45', 'This week'],
     ]);
     const blocks = taskBlocks(await day('2026-10-02'));
-    expect(blocks).toHaveLength(5);
+    expect(blocks).toHaveLength(6);
     expect(blocks.every((b) => !b.pinned && b.reason)).toBe(true);
-    // The Muqaddimah goes in its 75-minute sitting.
-    expect(blocks[0]).toMatchObject({ title: 'Read The Muqaddimah', durationMinutes: 75 });
+    // The problem set goes in its 90-minute sitting.
+    expect(blocks[0]).toMatchObject({ taskId: 'math-pset', durationMinutes: 90 });
   });
 
   it('re-plans the same way, lifting its own penciled blocks but keeping pinned ones and resized lengths', async () => {
     const first = await plan('2026-10-02');
-    const muq = taskBlocks(await day('2026-10-02')).find((b) => b.taskId === 'muqaddimah')!;
-    await call('POST', '/api/drops?tz=America/Chicago', { action: 'resizeBlock', blockId: muq.id, minutes: 60 });
+    const pset = taskBlocks(await day('2026-10-02')).find((b) => b.taskId === 'math-pset')!;
+    await call('POST', '/api/drops?tz=America/Chicago', { action: 'resizeBlock', blockId: pset.id, minutes: 60 });
     const again = await plan('2026-10-02');
-    expect(again.body.item.lifted).toBe(5);
-    // The shorter Muqaddimah block leaves room for one more.
-    expect(again.body.item.placed.map((p) => p.title).slice(0, 5)).toEqual(first.body.item.placed.map((p) => p.title));
-    expect(taskBlocks(await day('2026-10-02')).find((b) => b.taskId === 'muqaddimah')).toMatchObject({ durationMinutes: 60 });
+    expect(again.body.item.lifted).toBe(6);
+    // The shorter problem set leaves room for the Muqaddimah reading, right after getting the book.
+    const titles = again.body.item.placed.map((p) => p.title);
+    expect(titles.slice(0, 5)).toEqual(first.body.item.placed.map((p) => p.title).slice(0, 5));
+    expect(titles[5]).toBe('Read The Muqaddimah');
+    expect(local(again.body.item.placed[5]!.startAt) > local(again.body.item.placed[4]!.startAt)).toBe(true);
+    expect(taskBlocks(await day('2026-10-02')).find((b) => b.taskId === 'math-pset')).toMatchObject({ durationMinutes: 60 });
 
     // A block you placed stays put, and its task isn't planned again.
     const pinned = (await call<{ item: unknown }>('POST', '/api/drops?tz=America/Chicago', { action: 'placeTask', taskId: 'quant', date: '2026-10-02', startMin: 16 * 60 + 15 })).status;

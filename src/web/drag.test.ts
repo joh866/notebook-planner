@@ -8,7 +8,7 @@ const placed = { startAt: '2026-10-02T20:00:00Z', startMin: 900, endMin: 960 };
 const block = (over: Partial<BlockItem>): BlockItem => ({
   type: 'block', id: 'b', kind: 'task', title: 'Read', categoryId: null, taskId: 't', durationMinutes: 60, tentative: false,
   label: null, location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null,
-  ...placed, ...over,
+  condition: null, askNow: false, ...placed, ...over,
 });
 const routine: RoutineItem = {
   type: 'routine', id: 's@d', slotId: 's', routineId: 'r', title: 'Night routine', categoryId: 'routine', start: '15:00',

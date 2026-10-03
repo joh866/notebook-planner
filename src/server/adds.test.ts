@@ -84,8 +84,9 @@ describe('POST /api/add with the AI', () => {
 
     expect(byTitle(tasks, 'Turn in the form')).toMatchObject({ dueDate: '2026-10-09', dueAt: null });
     expect(byTitle(tasks, 'Get a lamp?')).toMatchObject({ window: 'decide', decisionYes: { makeTask: { title: 'Get a lamp', window: 'soon' } } });
-    // The same check-in question is reused, so it asks once for both.
-    expect(byTitle(tasks, 'Try climbing')).toMatchObject({ window: 'waiting', conditionId: 'cold' });
+    // The same check-in question is reused, so it asks once for both. A reply still saying "waiting"
+    // gets the question as an "if" condition, in Soon (spec v0.5).
+    expect(byTitle(tasks, 'Try climbing')).toMatchObject({ window: 'soon', conditionId: 'cold' });
     expect(byTitle(tasks, 'Practice scales')).toMatchObject({ sessionMinutes: 20, estLow: null });
     expect(byTitle(tasks, 'Office hours')).toMatchObject({ window: 'soon', categoryId: 'life' });
   });

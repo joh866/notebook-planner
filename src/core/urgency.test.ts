@@ -81,8 +81,8 @@ describe('effectiveWindow', () => {
     expect(win({ window: 'ongoing' })).toBe('ongoing');
   });
 
-  it('leaves waiting and decision items where they are', () => {
-    expect(win({ window: 'waiting', dueDate: '2026-09-30' })).toBe('waiting');
+  it('leaves decision items where they are', () => {
+    expect(win({ window: 'decide', dueDate: '2026-09-30' })).toBe('decide');
     expect(win({ window: 'decide', dueDate: '2026-10-02' })).toBe('decide');
   });
 

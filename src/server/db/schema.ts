@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, sqliteTable, text, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import {
   BlockKindSchema,
   DurationFeedbackSchema,
@@ -31,10 +31,12 @@ export const categories = sqliteTable('categories', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
-/** Check-in questions for waiting tasks (spec §10). */
+/** "If" conditions: check-in questions (spec §10, "Conditions"). */
 export const conditions = sqliteTable('conditions', {
   id: id(),
   question: text('question').notNull(),
+  /** How it reads under an item's title ("if it's open", "once the cold is fully gone"). */
+  phrase: text('phrase'),
   /** "Not yet" hides the question until this day. */
   snoozedUntil: text('snoozed_until'),
   answeredAt: text('answered_at'),
@@ -58,7 +60,11 @@ export const tasks = sqliteTable('tasks', {
   sittingMinutes: integer('sitting_minutes'),
   /** Minutes per session for skill-building items. */
   sessionMinutes: integer('session_minutes'),
+  /** An "if" condition. Yes on its question clears it (spec §10, "Conditions"). */
   conditionId: text('condition_id').references(() => conditions.id, { onDelete: 'set null' }),
+  /** An "after" condition: the task or event this comes after. */
+  afterTaskId: text('after_task_id').references((): AnySQLiteColumn => tasks.id, { onDelete: 'set null' }),
+  afterBlockId: text('after_block_id').references((): AnySQLiteColumn => blocks.id, { onDelete: 'set null' }),
   decisionYes: text('decision_yes', { mode: 'json' }).$type<DecisionYes>(),
   doneAt: text('done_at'),
   durationFeedback: text('duration_feedback', { enum: opts(DurationFeedbackSchema) }),
@@ -190,6 +196,10 @@ export const blocks = sqliteTable('blocks', {
   rolledFrom: text('rolled_from'),
   /** For events. Task blocks use the task's doneAt. */
   done: integer('done', { mode: 'boolean' }).notNull().default(false),
+  /** Conditions on an event, as on tasks. Task blocks use their task's. */
+  conditionId: text('condition_id').references(() => conditions.id, { onDelete: 'set null' }),
+  afterTaskId: text('after_task_id').references((): AnySQLiteColumn => tasks.id, { onDelete: 'set null' }),
+  afterBlockId: text('after_block_id').references((): AnySQLiteColumn => blocks.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 });
 

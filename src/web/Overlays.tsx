@@ -49,6 +49,7 @@ export function detailLines(b: Shown, day: DayView): string[] {
     if (item.changed) lines.push('Moved for this day only');
     for (const p of b.parts) lines.push(`${p.title}, ${p.endMin - p.startMin}m${p.waiting ? ', waiting' : ''}`);
   } else {
+    if (b.cond) lines.push(cap(b.cond));
     if (item.location) lines.push(item.location);
     if (item.tentative && item.label) lines.push(item.label);
     if (item.kind === 'task') {
@@ -111,12 +112,13 @@ interface PopoverProps {
   onCheck: (b: Shown) => void;
   onRemove: (b: Shown) => void;
   onPin: (b: Shown) => void;
+  onStillOn: (b: Shown, yes: boolean) => void;
   onEditClass: (classId: string) => void;
   onClose: () => void;
 }
 
-/** A block's details and actions: Done, Skip, Pin or Unpin, Back to the list, Edit (spec §7). */
-export function Popover({ b, anchor, day, onCheck, onRemove, onPin, onEditClass, onClose }: PopoverProps) {
+/** A block's details and actions: Done, Skip, Pin or Unpin, Back to the list, Edit, and "Still on?" (spec §7). */
+export function Popover({ b, anchor, day, onCheck, onRemove, onPin, onStillOn, onEditClass, onClose }: PopoverProps) {
   const { ref, pos } = useFloating(anchor, 'side', onClose, [b]);
   const item = b.item;
   const acts: { label: string; run: () => void; primary?: boolean }[] = [];
@@ -133,6 +135,13 @@ export function Popover({ b, anchor, day, onCheck, onRemove, onPin, onEditClass,
           {l}
         </div>
       ))}
+      {b.askNow && (
+        <div className="acts">
+          <span className="pm">Still on?</span>
+          <button className="pill primary" onClick={() => { onClose(); onStillOn(b, true); }}>Yes</button>
+          <button className="pill" onClick={() => { onClose(); onStillOn(b, false); }}>No</button>
+        </div>
+      )}
       <div className="acts">
         {acts.map((a) => (
           <button

@@ -10,7 +10,7 @@ import { ClassDialog, classTitle } from './ClassDialog';
 import { api, loadAll, type Changed, type Loaded } from './client';
 import { useDrag, type DragItem, type DropTarget, type Geometry } from './drag';
 import type { DrawerStop } from './drawer';
-import { aroundLabel, fmtDur, fmtTime, joinAnd, planMessage, relWord, repeatWords } from './format';
+import { aroundLabel, cap, fmtDur, fmtTime, joinAnd, planMessage, relWord, repeatWords } from './format';
 import { allCards, Header, type View } from './Header';
 import { Month } from './Month';
 import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
@@ -241,6 +241,14 @@ export function App() {
     if (item.type === 'block') return act(() => api.setBlockDone(item.id, !item.done));
   };
 
+  /** "Still on?" on a timed "if" item (spec §7). Yes makes it a normal item; No removes it, with Undo. */
+  const stillOn = (b: Shown, yes: boolean) => {
+    const item = b.item;
+    if (item.type !== 'block') return;
+    const [kind, id] = item.taskId ? (['tasks', item.taskId] as const) : (['blocks', item.id] as const);
+    void change(() => api.stillOn(kind, id, yes), yes ? `“${b.title}” is on.` : `Removed “${b.title}”.`);
+  };
+
   /** The × on a block, and the matching popover action (spec §7). */
   const removeBlock = (b: Shown) => {
     const item = b.item;
@@ -386,7 +394,7 @@ export function App() {
       return yes ? 'Noted.' : 'Dropped it.';
     }),
     answer: (id) => void change(() => api.answerCondition(id), (res) =>
-      res.moved.length ? `Moved ${joinAnd(res.moved.map((x) => `“${x.title}”`))} to Soon.` : 'Noted.'),
+      res.cleared.length ? `${cap(joinAnd(res.cleared.map((x) => `“${x.title}”`)))} ${res.cleared.length > 1 ? 'are' : 'is'} on.` : 'Noted.'),
     notYet: (id) => void change(() => api.snoozeCondition(id, addDays(data!.day.today, 1)), 'Asking again tomorrow.'),
     pickCategory: (t, el) => {
       setPop(null);
@@ -496,6 +504,7 @@ export function App() {
               onCheckTask={checkTask}
               onDetails={(b, el) => setPop({ b, el })}
               onRemove={(b) => void removeBlock(b)}
+              onStillOn={stillOn}
               onClearSometime={(taskId) => void change(() => api.clearSometime(taskId), 'Back on your list.')}
               onPlan={(target) => void change(() => api.plan(target), (r) => planMessage(r, day.today, day.zone))}
               drag={{
@@ -568,6 +577,7 @@ export function App() {
           onCheck={checkBlock}
           onRemove={(b) => void removeBlock(b)}
           onPin={(b) => void pinBlock(b)}
+          onStillOn={stillOn}
           onEditClass={setClassEdit}
           onClose={closePop}
         />

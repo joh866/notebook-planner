@@ -3,6 +3,7 @@ import type {
   AgendaView,
   CategoryView,
   ConditionAnswer,
+  StillOnResult,
   DayView,
   DecisionResult,
   DropInput,
@@ -114,6 +115,8 @@ export const api = {
   patchSettings: (body: SettingsPatch) => send<Changed<SettingsView>>('PATCH', '/api/settings', body),
 
   answerCondition: (id: string) => send<Changed<ConditionAnswer>>('POST', `/api/conditions/${id}/answer`),
+  /** "Still on?" on a timed "if" task or event (spec §7). */
+  stillOn: (kind: 'tasks' | 'blocks', id: string, yes: boolean) => send<Changed<StillOnResult>>('POST', `/api/${kind}/${id}/still-on`, { yes }),
   snoozeCondition: (id: string, until: string) => send<Changed>('PATCH', `/api/conditions/${id}`, { snoozedUntil: until }),
 
   setBlockDone: (id: string, done: boolean) => send<Changed>('PATCH', `/api/blocks/${id}`, { done }),

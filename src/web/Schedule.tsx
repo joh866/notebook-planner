@@ -36,13 +36,20 @@ export interface Shown {
   recurring: boolean;
   missed: boolean;
   parts: StepPart[];
+  /** Its "if" or "after" condition while it holds, for look C (spec §7). */
+  cond: string | null;
+  /** A timed "if" item whose time has come asks "Still on?". */
+  askNow: boolean;
 }
 
 const classTitle = (code: string, kind: string) => `${code}${kind ? ` ${kind.toLowerCase()}` : ''}`;
 
 export function shown(item: ScheduleItem, today: string): Shown {
   const range = fmtRange(item.startMin, item.endMin);
-  const base = { key: item.id, item, startMin: item.startMin, endMin: item.endMin, pinned: false, penciled: false, recurring: false, missed: false, parts: [] };
+  const base = {
+    key: item.id, item, startMin: item.startMin, endMin: item.endMin, pinned: false, penciled: false, recurring: false, missed: false, parts: [],
+    cond: item.type === 'block' ? (item.condition?.text ?? null) : null, askNow: item.type === 'block' && item.askNow,
+  };
   if (item.type === 'class') {
     return {
       ...base, look: item.skipped ? 'skipped' : 'class', title: classTitle(item.code, item.kind),
@@ -94,13 +101,15 @@ interface Props {
   onCheckTask: (taskId: string, done: boolean) => void;
   onDetails: (b: Shown, el: HTMLElement) => void;
   onRemove: (b: Shown) => void;
+  /** "Still on?" Yes or No on a timed "if" item. */
+  onStillOn: (b: Shown, yes: boolean) => void;
   onClearSometime: (taskId: string) => void;
   /** Plans the given day. */
   onPlan: (date: string) => void;
   drag: { begin: BeginDrag; view: DragView | null; onGeometry: (g: Geometry) => void };
 }
 
-export function Schedule({ day, settings, categories, nowMin, opened, onOpen, onCheck, onCheckTask, onDetails, onRemove, onClearSometime, onPlan, drag }: Props) {
+export function Schedule({ day, settings, categories, nowMin, opened, onOpen, onCheck, onCheckTask, onDetails, onRemove, onStillOn, onClearSometime, onPlan, drag }: Props) {
   const all = useMemo(() => day.schedule.map((x) => shown(x, day.today)), [day]);
   // While a block's bottom edge is dragged, it shows its new length.
   const t = drag.view?.target;
@@ -186,12 +195,12 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
           </div>
         ))}
         {open.map((b) => (
-          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} begin={drag.begin} />
+          <Block key={b.key} b={b} col={0} cols={1} y={y} categories={categories} onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} onStillOn={onStillOn} begin={drag.begin} />
         ))}
         {rest.map((b, i) => (
           <Block
             key={b.key} b={b} col={cols[i]!.col} cols={cols[i]!.cols} y={y} categories={categories}
-            onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} begin={drag.begin}
+            onCheck={onCheck} onDetails={onDetails} onRemove={onRemove} onStillOn={onStillOn} begin={drag.begin}
           />
         ))}
         {ghost && (
@@ -248,10 +257,11 @@ interface BlockProps {
   onCheck: (b: Shown) => void;
   onDetails: (b: Shown, el: HTMLElement) => void;
   onRemove: (b: Shown) => void;
+  onStillOn: (b: Shown, yes: boolean) => void;
   begin: BeginDrag;
 }
 
-function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, begin }: BlockProps) {
+function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onStillOn, begin }: BlockProps) {
   const top = y(b.startMin);
   const height = Math.max(y(b.endMin) - top - 3, 20);
   const short = height < 37;
@@ -259,7 +269,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, begi
   const minutes = b.endMin - b.startMin;
   const cls = [
     'block', b.look, b.done && 'done', !b.checkable && 'nocb', !moves && 'nodrag', b.missed && 'missed', short && 'short',
-    b.parts.length && 'has-parts',
+    b.parts.length && 'has-parts', b.cond && 'conditional',
   ].filter(Boolean).join(' ');
   const style = {
     ...catStyle(categories, b.categoryId),
@@ -301,7 +311,15 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, begi
         {b.penciled && <PencilIcon />}
         {b.recurring && <RepeatIcon />}
       </div>
+      {b.cond && <div className="bc">{b.cond}</div>}
       <div className="bm">{b.sub}</div>
+      {b.askNow && (
+        <div className="ask" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+          Still on?
+          <button onClick={() => onStillOn(b, true)}>Yes</button>
+          <button onClick={() => onStillOn(b, false)}>No</button>
+        </div>
+      )}
       <Del label={`${removeLabel(b)}: ${b.title}`} onClick={() => onRemove(b)} />
       {moves && (
         <div

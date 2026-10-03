@@ -45,14 +45,14 @@ describe('localParse on the October 1 todo', () => {
     expect(find('Get razor')).toMatchObject({ title: 'Get razor', win: 'week' });
   });
 
-  it('makes "?" items decisions, and contingent ones waiting with a question', () => {
+  it('makes "?" items decisions, and gives contingent ones an "if" with a question in their own window', () => {
     expect(find('Get a new blanket')).toMatchObject({ title: 'Get a new blanket?', win: 'decide' });
     expect(find('Get foam mattress topper')).toMatchObject({ win: 'decide' });
     expect(find('Skip tomorrow’s econ discussion')).toMatchObject({ win: 'decide' });
-    expect(find('Go to gym')).toMatchObject({ title: 'Go to gym', win: 'waiting', wait: 'Once recovered fully from cold?' });
-    expect(find('Do the ARCH reading')).toMatchObject({ win: 'waiting', wait: 'If I get in?' });
-    expect(find('Update resume')).toMatchObject({ win: 'waiting', wait: 'Once the qnet certificate is received?' });
-    expect(find('Check out boxing club')).toMatchObject({ win: 'waiting' });
+    expect(find('Go to gym')).toMatchObject({ title: 'Go to gym', win: 'week', if: 'once recovered fully from cold', ask: 'Once recovered fully from cold?' });
+    expect(find('Do the ARCH reading')).toMatchObject({ win: 'week', if: 'if I get in', ask: 'If I get in?' });
+    expect(find('Update resume')).toMatchObject({ win: 'soon', ask: 'Once the qnet certificate is received?' });
+    expect(find('Check out boxing club')).toMatchObject({ win: 'week', ask: 'Has it happened yet?' });
   });
 
   it('makes daily, weekly, and every-other-week routines', () => {

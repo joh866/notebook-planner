@@ -41,7 +41,13 @@ export const ParsedItemSchema = z.object({
   sitting: opt(Minutes),
   session: opt(Minutes),
   steps: opt(z.array(ParsedStepSchema.optional().catch(undefined)).transform((a) => a.filter((s): s is ParsedStep => !!s))),
+  /** An "if" condition as it reads under the title ("if it's open"). */
+  if: opt(Short),
+  /** The check-in question for it ("Is it open?"). `wait` is the older name. */
+  ask: opt(Short),
   wait: opt(Short),
+  /** An "after" condition: an existing item's id, or the title of another item in the same text. */
+  after: opt(Short),
   repeat: opt(z.object({
     days: z.union([z.literal('daily'), z.array(z.coerce.number().int().min(0).max(6)).min(1)]),
     every: opt(z.union([z.literal(1), z.literal(2)])),

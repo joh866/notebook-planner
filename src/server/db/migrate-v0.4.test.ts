@@ -91,3 +91,27 @@ describe('v0.4 data migration', () => {
     expect(seed(db)).toBe(true);
   });
 });
+
+describe('v0.5 data migration (conditions)', () => {
+  it('moves waiting tasks into their windows, keeping their questions as "if" conditions', () => {
+    const db = migratedV03((sqlite) => {
+      sqlite.exec(`
+        UPDATE conditions SET answered_at = '2026-10-02T16:39:12Z' WHERE id = 'cold';
+        UPDATE tasks SET window = 'soon' WHERE id = 'boxing';
+        INSERT INTO tasks (id, title, window, condition_id) VALUES ('mine', 'My own waiting task', 'waiting', 'arch');
+      `);
+    });
+    const task = (id: string) => db.select().from(t.tasks).where(eq(t.tasks.id, id)).get();
+    // Answered Yes before: nothing holds them back, and boxing stays where Yes moved it.
+    expect(task('gym')).toMatchObject({ window: 'week', conditionId: null });
+    expect(task('boxing')).toMatchObject({ window: 'soon', conditionId: null });
+    // Still waiting: the seed's window from spec §16, with the question kept.
+    expect(task('arch-reading')).toMatchObject({ window: 'week', conditionId: 'arch' });
+    expect(task('resume')).toMatchObject({ window: 'soon', conditionId: 'qnet' });
+    expect(task('mine')).toMatchObject({ window: 'soon', conditionId: 'arch' });
+    expect(db.select().from(t.tasks).all().some((x) => x.window === ('waiting' as never))).toBe(false);
+    expect(db.select().from(t.conditions).where(eq(t.conditions.id, 'arch')).get()?.phrase).toBe('if I get into ARCH');
+    expect(task('muqaddimah')?.afterTaskId).toBe('get-book');
+    expect(task('response')?.afterTaskId).toBe('muqaddimah');
+  });
+});

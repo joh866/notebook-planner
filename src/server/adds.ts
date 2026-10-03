@@ -19,7 +19,7 @@ import type { SortChunk } from './ai';
 import type { Db } from './db/client';
 import * as t from './db/schema';
 import { readBody, type Run } from './resources';
-import { tableOf, type Change, type TableName, type Tx } from './undo';
+import { findRows, tableOf, whereKey, type Change, type TableName, type Tx } from './undo';
 import { autoPencil } from './plan';
 import { getSettings } from './views';
 
@@ -122,14 +122,50 @@ class Adder {
   }
 
   /** The open check-in question with these words, or a new one. */
-  private condition(question: string): string {
+  private condition(question: string, phrase: string | null): string {
     const q = question.trim();
     const found = this.conditions.find((c) => !c.answeredAt && String(c.question).toLowerCase() === q.toLowerCase());
     if (found) return found.id as string;
-    const row: Row = { id: randomUUID(), question: q };
+    const row: Row = { id: randomUUID(), question: q, phrase };
     this.insert('conditions', [row]);
     this.conditions.push(row);
     return row.id as string;
+  }
+
+  /** An item's "if" and "after" conditions (spec §10, "Conditions"). "After" links wait until everything is added. */
+  private addConditions(p: ParsedItem, table: 'tasks' | 'blocks', row: Row) {
+    const ask = p.ask ?? p.wait ?? (p.if ? `${p.if.charAt(0).toUpperCase()}${p.if.slice(1).replace(/[.?]+$/, '')}?` : null);
+    if (ask) row.conditionId = this.condition(ask, p.if ?? null);
+    if (p.after) this.afters.push({ table, id: row.id as string, after: p.after });
+  }
+
+  private afters: { table: 'tasks' | 'blocks'; id: string; after: string }[] = [];
+
+  /**
+   * Links "after" items to what they come after: an existing item's id, or a title, matched first
+   * among the items just added, then among unfinished tasks and upcoming events.
+   */
+  linkAfters() {
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const tasks = this.tx.select().from(t.tasks).all().filter((x) => !x.doneAt);
+    const events = this.tx.select().from(t.blocks).all().filter((b) => b.kind === 'event' && b.title);
+    const fresh = new Set(this.added.map((a) => a.id));
+    const pool = [
+      ...tasks.map((x) => ({ table: 'tasks' as const, id: x.id, title: x.title, fresh: fresh.has(x.id) })),
+      ...events.map((b) => ({ table: 'blocks' as const, id: b.id, title: b.title!, fresh: fresh.has(b.id) })),
+    ].sort((a, b) => Number(b.fresh) - Number(a.fresh));
+    for (const link of this.afters) {
+      const want = norm(link.after);
+      const others = pool.filter((x) => x.id !== link.id);
+      const hit = others.find((x) => x.id === link.after) ?? others.find((x) => norm(x.title) === want)
+        ?? others.find((x) => want.length > 3 && (norm(x.title).includes(want) || want.includes(norm(x.title))));
+      if (!hit) continue;
+      const set = hit.table === 'tasks' ? { afterTaskId: hit.id, afterBlockId: null } : { afterTaskId: null, afterBlockId: hit.id };
+      const table = link.table === 'tasks' ? t.tasks : t.blocks;
+      const where = whereKey(link.table, { id: link.id });
+      this.change.before(link.table, findRows(this.tx, link.table, where));
+      this.tx.update(table).set(set).where(where).run();
+    }
   }
 
   add(raw: ParsedItem) {
@@ -143,7 +179,7 @@ class Adder {
     if (p.type === 'event') return this.addEvent(p);
     // A task for today, with no time, goes in today's Sometime lane (spec §7).
     const { today, calToday } = this.ctx;
-    if ((p.date === today || p.date === calToday) && !p.due && p.win !== 'waiting' && p.win !== 'decide') {
+    if ((p.date === today || p.date === calToday) && !p.due && p.win !== 'decide') {
       return this.addTask(p, { window: 'near', sometime: calToday });
     }
     this.addTask(p);
@@ -168,7 +204,7 @@ class Adder {
         row.dueAt = iso(clockOnDay(date, p.due.time, homeZone));
       } else row.dueDate = p.due.date === today ? calToday : p.due.date;
     }
-    if (window === 'waiting') row.conditionId = this.condition(p.wait ?? 'Has it happened yet?');
+    this.addConditions(p, 'tasks', row);
     if (window === 'decide') row.decisionYes = { makeTask: { title: p.title.replace(/\s*\?+\s*$/, ''), window: 'soon' } };
     this.insert('tasks', [row]);
     this.insert('taskSteps', (p.steps ?? []).map((s, i) => ({
@@ -237,6 +273,7 @@ class Adder {
       startAt, durationMinutes: end - start, tentative: !!p.tentative,
       label: p.tentative ? aroundLabel(start, p.meta) : (p.meta ?? null), location: p.loc ?? null, pinned: true,
     };
+    this.addConditions(p, 'blocks', row);
     this.insert('blocks', [row]);
     this.added.push({ kind: 'event', id: row.id as string, title: p.title, date, startAt });
   }
@@ -275,6 +312,7 @@ export function registerAdds(app: Hono, db: Db, run: Run, now: () => DateTime, s
     return c.json(run((tx, change): AddResult => {
       const adder = new Adder(tx, change, { now: at, zone, homeZone: settings.homeTimeZone, today, calToday, tags });
       for (const item of items) adder.add(item);
+      adder.linkAfters();
       // With automatic scheduling on, new tasks that are due soon get penciled in (spec §12).
       const tasks = adder.added.filter((a) => a.kind === 'task');
       const penciled = autoPencil(db, tx, change, at, device, tasks.map((a) => a.id));

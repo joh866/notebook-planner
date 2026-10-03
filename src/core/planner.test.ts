@@ -13,7 +13,7 @@ const chicago = (s: string) => DateTime.fromISO(s, { zone: CHI }).toUTC().toISO(
 
 const task = (id: string, more: Partial<PlanTask> = {}): PlanTask => ({
   id, title: id, window: 'soon', dueAt: null, dueDate: null, estLow: null, estHigh: null, sittingMinutes: null, sessionMinutes: null,
-  doneAt: null, steps: [], sometime: null, scheduled: false, ...more,
+  doneAt: null, steps: [], sometime: null, scheduled: false, ifPending: false, after: null, ...more,
 });
 const day = (date: string, from: number, to: number, busy: [number, number][] = []): DayFree => ({ date, from, to, busy });
 
@@ -47,7 +47,7 @@ describe('free time', () => {
     });
     const blk = (id: string, kind: BlockItem['kind'], a: number, b: number): BlockItem => ({
       ...base, type: 'block', id, kind, title: id, taskId: null, startMin: a, endMin: b, durationMinutes: b - a, tentative: false, label: null,
-      location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null,
+      location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null, condition: null, askNow: false,
     });
     const laundry: RoutineItem = {
       ...base, type: 'routine', id: 'l', slotId: 'l', routineId: 'l', title: 'Laundry', start: '10:00', durationMinutes: 140, changed: false,
@@ -95,8 +95,8 @@ describe('scoreTask', () => {
       .toEqual({ score: 212, reason: 'You picked this day for it' });
   });
 
-  it('never plans waiting, decision, done, or already-due tasks', () => {
-    expect(scoreTask(task('a', { window: 'waiting' }), '2026-10-02', clock)).toBeNull();
+  it('never plans unanswered "if", decision, done, or already-due tasks', () => {
+    expect(scoreTask(task('a', { ifPending: true }), '2026-10-02', clock)).toBeNull();
     expect(scoreTask(task('a', { window: 'decide' }), '2026-10-02', clock)).toBeNull();
     expect(scoreTask(task('a', { doneAt: chicago('2026-10-02T10:00') }), '2026-10-02', clock)).toBeNull();
     expect(scoreTask(task('a', { window: 'week', dueDate: '2026-10-03' }), '2026-10-04', clock)).toBeNull();
@@ -189,5 +189,49 @@ describe('capacity', () => {
     expect(capacity([task('a', { dueAt: due, estLow: 300, estHigh: 400, steps })], clock, free, new Map())).toBeNull();
     expect(capacity([task('far', { dueDate: '2026-10-12', estLow: 6000, estHigh: 6000 })], clock, free, new Map())).toBeNull();
     expect(capacity([task('late', { dueAt: chicago('2026-10-01T09:00'), estLow: 6000, estHigh: 6000 })], clock, free, new Map())).toBeNull();
+  });
+});
+
+describe('conditions (spec §10)', () => {
+  const get = task('get', { title: 'Get The Muqaddimah', window: 'week', estLow: 20 });
+  const read = task('read', { title: 'Read The Muqaddimah', window: 'week', dueAt: chicago('2026-10-06T14:00'), estLow: 180, sittingMinutes: 75,
+    after: { taskId: 'get', ends: null } });
+
+  it('can’t place Read The Muqaddimah before Get The Muqaddimah', () => {
+    const placed = planDay(day('2026-10-03', 9 * 60, 24 * 60), [read, get], clock);
+    const at = new Map(placed.map((p) => [p.taskId, p]));
+    expect(at.get('get')).toBeDefined();
+    expect(at.get('read')!.startMin).toBeGreaterThanOrEqual(at.get('get')!.startMin + at.get('get')!.minutes);
+  });
+
+  it('leaves an "after" item off the day when its prerequisite isn’t on it, or comes later', () => {
+    expect(planDay(day('2026-10-03', 9 * 60, 24 * 60), [read], clock)).toEqual([]);
+    const later = { ...read, after: { taskId: 'get', ends: { date: '2026-10-04', min: 600 } } };
+    expect(planDay(day('2026-10-03', 9 * 60, 24 * 60), [later], clock)).toEqual([]);
+  });
+
+  it('places an "after" item after its prerequisite ends that day, and freely on later days', () => {
+    const sameDay = { ...read, after: { taskId: null, ends: { date: '2026-10-03', min: 14 * 60 } } };
+    expect(planDay(day('2026-10-03', 9 * 60, 24 * 60), [sameDay], clock)[0]!.startMin).toBeGreaterThanOrEqual(14 * 60);
+    const before = { ...read, after: { taskId: null, ends: { date: '2026-10-02', min: 20 * 60 } } };
+    expect(planDay(day('2026-10-03', 9 * 60, 24 * 60), [before], clock)[0]!.startMin).toBe(9 * 60);
+  });
+
+  it('never plans an "if" item until it’s answered, by the Plan button or automatic scheduling', () => {
+    const gym = task('gym', { window: 'near', estLow: 60, ifPending: true });
+    expect(planDay(day('2026-10-03', 9 * 60, 24 * 60), [gym], clock)).toEqual([]);
+    expect(placeNew([gym], clock, (d) => day(d, 9 * 60, 24 * 60))).toEqual([]);
+    expect(planDay(day('2026-10-03', 9 * 60, 24 * 60), [{ ...gym, ifPending: false }], clock)).toHaveLength(1);
+  });
+
+  it('automatic scheduling puts an "after" item after its prerequisite', () => {
+    const getNear = { ...get, window: 'near' as const };
+    const readNear = { ...read, window: 'near' as const, dueAt: null };
+    const placed = placeNew([readNear, getNear], clock, (d) => day(d, d === '2026-10-02' ? 15 * 60 + 10 : 9 * 60, 24 * 60));
+    // Read comes first in the list but waits for Get, then goes after it.
+    const g = placed.find((p) => p.taskId === 'get')!;
+    const r = placed.find((p) => p.taskId === 'read')!;
+    expect([g.date, r.date]).toEqual(['2026-10-02', '2026-10-02']);
+    expect(r.startMin).toBeGreaterThanOrEqual(g.startMin + g.minutes);
   });
 });

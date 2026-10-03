@@ -64,7 +64,7 @@ describe('labels', () => {
       <Header key="h" view="day" date={DAY} day={v.day} weekStart={0} now={NOW} onView={noop} onShift={noop} onToday={noop} onSettings={noop} />,
       <Schedule
         key="s" day={v.day} settings={v.settings} categories={v.categories} nowMin={nowMin} opened={{ early: true, late: true }}
-        onOpen={noop} onCheck={noop} onCheckTask={noop} onDetails={noop} onRemove={noop} onClearSometime={noop} onPlan={noop} drag={drag}
+        onOpen={noop} onCheck={noop} onCheckTask={noop} onDetails={noop} onRemove={noop} onStillOn={noop} onClearSometime={noop} onPlan={noop} drag={drag}
       />,
       <TaskPanel
         key="t" day={v.day} categories={v.categories} filter="all" showDone openId="math-pset" onFilter={noop} onShowDone={noop}
