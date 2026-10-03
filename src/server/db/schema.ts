@@ -251,4 +251,20 @@ export const settings = sqliteTable('settings', {
   weekStart: integer('week_start').notNull().default(0),
   notify: text('notify', { mode: 'json' }).notNull().$type<Notify>(),
   canvasFeedUrl: text('canvas_feed_url'),
+  /** The last Canvas fetch, and what it found or why it failed (spec §14). Never the link itself. */
+  canvasSyncedAt: text('canvas_synced_at'),
+  canvasNote: text('canvas_note'),
+});
+
+/**
+ * Items brought in from a calendar feed (spec §14, "Canvas"), by the feed's own id. `snapshot` is
+ * what the feed last wrote, so a field the user changed is never overwritten. A task the user
+ * deleted keeps its row with no task, so it isn't brought back.
+ */
+export const feedItems = sqliteTable('feed_items', {
+  uid: text('uid').primaryKey(),
+  source: text('source', { enum: ['canvas'] }).notNull(),
+  taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+  snapshot: text('snapshot', { mode: 'json' }).notNull().$type<{ title: string; meta: string | null; dueAt: string | null; dueDate: string | null }>(),
+  lastSeenAt: text('last_seen_at').notNull(),
 });

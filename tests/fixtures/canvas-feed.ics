@@ -1,0 +1,52 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Instructure//Canvas//EN
+X-WR-CALNAME:Student Calendar (Canvas)
+X-WR-CALDESC:Calendar events for the user
+BEGIN:VEVENT
+DTEND:20261007T160000Z
+DTSTAMP:20261002T120000Z
+DTSTART:20261007T160000Z
+CLASS:PUBLIC
+DESCRIPTION:Problems 1–6 from chapter 1\, written up in LaTeX.\n
+SEQUENCE:0
+SUMMARY:Problem Set 1 [MATH 15910 1 (Autumn 2026) Introduction to Proofs in Analysis]
+URL;VALUE=URI:https://canvas.example.edu/courses/12345/assignments/67890
+UID:event-assignment-67890
+END:VEVENT
+BEGIN:VEVENT
+DTEND;VALUE=DATE:20261010
+DTSTAMP:20261002T120000Z
+DTSTART;VALUE=DATE:20261009
+CLASS:PUBLIC
+SUMMARY:Reading response 1 [SOSC 16100 3 (Autumn 2026) Global Society I]
+URL;VALUE=URI:https://canvas.example.edu/courses/12346/assignments/67891
+UID:event-assignment-67891
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261002T120000Z
+DTSTART;TZID=America/Chicago:20261012T235900
+SUMMARY:Problem Set 2: supply\, demand\, and elastic
+ ities [ECON 20010 1 (Autumn 2026) The Elements of Economic Analysis I Honors]
+UID:event-assignment-67892
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261002T120000Z
+DTSTART:20261008T190000Z
+DTEND:20261008T200000Z
+SUMMARY:Office hours [MATH 15910 1 (Autumn 2026) Introduction to Proofs in Analysis]
+UID:event-calendar-event-5555
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261002T120000Z
+DTSTART:20261020T045900Z
+SUMMARY:Lab report 1 [CHEM 11100 2 (Autumn 2026) Comprehensive General Chemistry I]
+UID:event-assignment-67893
+END:VEVENT
+BEGIN:VEVENT
+DTSTAMP:20261002T120000Z
+DTSTART:20260925T045900Z
+SUMMARY:Syllabus quiz [MATH 15910 1 (Autumn 2026) Introduction to Proofs in Analysis]
+UID:event-assignment-67000
+END:VEVENT
+END:VCALENDAR

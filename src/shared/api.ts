@@ -426,6 +426,8 @@ export interface TaskCard {
   sessionMinutes: number | null;
   /** 15 minutes or less, or marked quick: it can go in a "Quick things" block (spec §10). */
   quick: boolean;
+  /** Brought in from Canvas (spec §14). */
+  fromCanvas: boolean;
   /** Its running session, if Start was pressed. */
   running: { sessionId: string; startAt: string } | null;
   /** Minutes recorded so far (spec §10, "Partial progress"). */
@@ -661,6 +663,18 @@ export interface SettingsView {
   weekStart: number;
   notify: Notify;
   canvasFeedUrl: string | null;
+  /** The last Canvas check, and what it found or why it failed (spec §14). */
+  canvasSyncedAt: string | null;
+  canvasNote: string | null;
+}
+
+/** POST /api/canvas/sync: what a Canvas check did. */
+export interface CanvasSync {
+  added: number;
+  updated: number;
+  /** Assignments in the feed. */
+  seen: number;
+  error: string | null;
 }
 
 /** GET /api/categories. Built-ins have no color; they use the palette in spec §4. */

@@ -594,7 +594,7 @@ The real build uses Google sign-in (OAuth) and the Google Calendar API. No file 
 
 ### Canvas
 
-Use the Calendar Feed link (Canvas, then Calendar, then Calendar Feed). It's a private iCal URL with assignments and events from all courses, about 366 days ahead and 30 days back. The server fetches it on a schedule.
+Use the Calendar Feed link (Canvas, then Calendar, then Calendar Feed). It's a private iCal URL with assignments and events from all courses, about 366 days ahead and 30 days back. The server fetches it when it starts and every 3 hours, and Settings has Check now. Assignments already past due when first seen aren't added, since the feed can't say whether they were turned in.
 
 Limits:
 - Only items professors gave due dates.

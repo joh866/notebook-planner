@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react';
-import type { CategoryView, SettingsView } from '../shared/api';
+import { DateTime } from 'luxon';
+import type { CanvasSync, CategoryView, SettingsView } from '../shared/api';
+import { fmtTime } from './format';
 import { categoryName, catStyle, CUSTOM_COLORS, findCategory, nextColor } from './cats';
 import { classTitle } from './ClassDialog';
 import { api, deviceZone, type Changed, type ClassRow, type SettingsPatch } from './client';
@@ -13,7 +15,7 @@ interface Props {
   /** A dialog is open on top, so Escape is its to handle. */
   covered: boolean;
   /** Runs a change, reloads, and says the message with Undo. */
-  change: <T>(run: () => Promise<Changed<T>>, message: string | null) => Promise<unknown>;
+  change: <T>(run: () => Promise<Changed<T>>, message: string | null | ((item: T) => string | null)) => Promise<unknown>;
   say: (message: string) => void;
   onEditClass: (id: string | 'new') => void;
   /** Wake or bed time changed, so the folded hours start folded again. */
@@ -21,6 +23,13 @@ interface Props {
   /** Opens the time log (spec §13). */
   onTimeLog: () => void;
   onClose: () => void;
+}
+
+/** "today 2:15pm" or "Oct 3, 2:15pm" for the last Canvas check. */
+function canvasWhen(at: string): string {
+  const d = DateTime.fromISO(at).toLocal();
+  const time = fmtTime(d.hour * 60 + d.minute);
+  return d.hasSame(DateTime.local(), 'day') ? `today ${time}` : `${d.toFormat('LLL d')}, ${time}`;
 }
 
 /** A row of buttons where one is chosen. */
@@ -129,8 +138,20 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
       }
     }
     if (url === (st.canvasFeedUrl ?? '')) return;
-    void patch({ canvasFeedUrl: url || null }, url ? 'Saved. Canvas assignments will show up here once the feed is connected in a later step.' : 'Cleared.');
+    void (async () => {
+      await patch({ canvasFeedUrl: url || null }, url ? null : 'Cleared.');
+      if (url) await checkCanvas('Saved.');
+    })();
   };
+
+  /** Fetches the feed now (spec §14). It also runs on its own every few hours. */
+  const checkCanvas = (lead = '') => change(() => api.syncCanvas(), (r: CanvasSync) => {
+    if (r.error) return `${lead} Couldn’t check Canvas: ${r.error}.`.trim();
+    const what = r.added || r.updated
+      ? `${r.added ? `${r.added} new` : ''}${r.added && r.updated ? ', ' : ''}${r.updated ? `${r.updated} updated` : ''}`
+      : 'nothing new';
+    return `${lead} Checked Canvas: ${r.seen} assignment${r.seen === 1 ? '' : 's'}, ${what}.`.trim();
+  });
 
   const rename = (c: CategoryView, raw: string) => {
     const name = raw.trim();
@@ -321,6 +342,14 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
             <button className="box boxbtn" onClick={saveCanvas}>
               Save
             </button>
+            {st.canvasFeedUrl && (
+              <div className="full srow">
+                <span className="grow sub2">
+                  {st.canvasSyncedAt ? `Checked ${canvasWhen(st.canvasSyncedAt)}: ${st.canvasNote ?? ''}.` : 'Not checked yet.'} It checks again every 3 hours.
+                </span>
+                <button className="box boxbtn" onClick={() => void checkCanvas()}>Check now</button>
+              </div>
+            )}
           </div>
         </section>
 

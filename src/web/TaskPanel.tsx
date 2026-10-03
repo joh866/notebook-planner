@@ -321,6 +321,7 @@ function detailBits(t: TaskCard, day: DayView): { when: string | null; rest: str
   if (t.steps.length) rest.push(`${t.steps.filter((s) => s.done).length} of ${t.steps.length} steps`);
   if (t.loggedMinutes && !t.doneAt) rest.push(`${fmtDur(t.loggedMinutes)} done so far`);
   if (t.notes) rest.push('Has notes');
+  if (t.fromCanvas) rest.push('From Canvas');
   return { when, rest };
 }
 

@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13f.
+Step 13g.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -112,7 +112,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
     - "go to mtg event at crear library preferably before 1:30pm, head to go club after asap and stop by if its open, meet with friends at around 4 to go to gym for 90 minutes"
 
     Test the mapping using recorded AI replies, with no network in tests. Then the user checks it once with the real API.
-- [ ] **13f. Canvas calendar feed** (spec §14). This moved up from step 17, since it works on localhost.
+- [x] **13f. Canvas calendar feed** (spec §14). This moved up from step 17, since it works on localhost.
   - The server fetches the saved feed link on start and every few hours.
   - Assignments become tasks with deadlines in Classes, matched to courses by code and marked "From Canvas."
   - Fetching again updates instead of duplicating, and never overwrites something the user changed.
@@ -227,4 +227,15 @@ Agents add short notes here when a step is done.
   - **Offers.** `answers` become `offers` (open questions only), shown as "Is the cold fully gone? Yes" buttons on the toast. `addMessage` now lists changes (via `changeText`, and `logMessage` for time), what it couldn't find, and the questions. With only items, the message is the same as before.
   - Tests: `tests/fixtures/notes-oct-9.txt` holds the user's two exact lines, and `notes-oct-9.replies.json` the recorded replies. `server/addChanges.test.ts` covers both lines (the 3:46pm log with the RSO fair trimmed and one Undo; the MTG event at 1:15pm, the Go club right after it if it's open, the gym 4–5:30pm, and the cold offer), what the prompt contains, every change action, matching by words, partial progress, questions, and missing items. No existing test's expected results changed (the `addMessage.test` fixture gained the new empty lists).
   - **Not done yet:** the user's one check with the real API, using these two lines.
+- Step 13f:
+  - **Data.** Migration `0008` adds `feed_items`: the feed's UID, source, task (`ON DELETE set null`), a `snapshot` of the title, course, and deadline it last wrote, and when it was last seen. It also adds `settings.canvas_synced_at` and `canvas_note`. A deleted task keeps its feed row with no task, so it never comes back.
+  - **Core.** `core/ical.ts` is a small iCal reader (folded lines, escapes, UTC times, `TZID` times, and whole days). `core/canvas.ts` keeps `event-assignment-*` events, takes the title from before the `[course]` brackets, and matches the course by code to a class (or keeps the code Canvas gives).
+  - **Server** (`server/canvas.ts`).
+    - `startCanvasSync` runs in `index.ts` on start and every 3 hours. `POST /api/canvas/sync` is Check now, with one Undo.
+    - New assignments due from now on become Classes tasks in Soon, which rise with their deadline. On later fetches, a field changes only if it still matches the snapshot, so whatever the user changed stays.
+    - The link is never logged or put in a message. Failures note a safe reason ("Canvas answered 404", "couldn’t reach Canvas").
+    - `createApp` takes `fetchFeed`, which tests replace with the saved sample.
+  - **Web.** Cards say "From Canvas" (`fromCanvas`). Settings saves the link and then checks right away, shows "Checked today 2:15pm: 5 assignments, 4 new", and has Check now.
+  - Tests: `tests/fixtures/canvas-feed.ics` (assignments with a time, a whole day, a `TZID` time, a folded line, a calendar event, a course that isn't theirs, and a past one), `core/ical.test.ts`, and `server/canvas.test.ts` (adds, updates without duplicating, keeps the user's changes and deletions, updates untouched fields, Undo, failures). No existing tests changed.
+  - The real database has no Canvas link saved yet, so nothing has been fetched.
 

@@ -57,6 +57,7 @@ function load(db: Db) {
     sometime: db.select().from(t.sometime).all(),
     quickItems: db.select().from(t.quickItems).orderBy(t.quickItems.sortOrder).all(),
     sessions: db.select().from(t.taskSessions).orderBy(t.taskSessions.startAt).all(),
+    feedItems: db.select().from(t.feedItems).all(),
   };
 }
 type Data = ReturnType<typeof load>;
@@ -297,7 +298,7 @@ function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number], slots: ReturnTyp
     effectiveWindow: effectiveWindow(task, ctx.now, ctx.zone, ctx.homeZone),
     dueAt: task.dueAt, dueDate: task.dueDate, dueTone: dueTone(task, ctx.now, ctx.zone, ctx.homeZone),
     shortName: task.shortName, estLow: task.estLow, estHigh: task.estHigh, sittingMinutes: task.sittingMinutes,
-    sessionMinutes: task.sessionMinutes, quick: isQuick(task),
+    sessionMinutes: task.sessionMinutes, quick: isQuick(task), fromCanvas: ctx.data.feedItems.some((f) => f.taskId === task.id),
     running: (() => {
       const r = runningOf(ctx, task.id);
       return r ? { sessionId: r.id, startAt: r.startAt } : null;

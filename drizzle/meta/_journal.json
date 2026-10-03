@@ -57,6 +57,13 @@
       "when": 1791044544797,
       "tag": "0007_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791045689469,
+      "tag": "0008_canvas",
+      "breakpoints": true
     }
   ]
 }

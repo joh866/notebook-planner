@@ -2,6 +2,7 @@ import type {
   AddResult,
   AgendaView,
   CategoryView,
+  CanvasSync,
   ChangesResult,
   ConditionAnswer,
   LogResult,
@@ -126,6 +127,8 @@ export const api = {
   addSession: (taskId: string, startAt: string, minutes: number) => send<Changed<SessionView>>('POST', `/api/tasks/${taskId}/sessions`, { startAt, minutes }),
   patchSession: (id: string, body: { startAt?: string; endAt?: string }) => send<Changed<SessionView>>('PATCH', `/api/task-sessions/${id}`, body),
   deleteSession: (id: string) => send<Changed>('DELETE', `/api/task-sessions/${id}`),
+  /** Checks the Canvas feed now (spec §14). */
+  syncCanvas: () => send<Changed<CanvasSync>>('POST', '/api/canvas/sync'),
   /** A question's button after the add box: make the change with the chosen item (spec §11). */
   applyChange: (change: Record<string, unknown>, id: string) => send<Changed<ChangesResult>>('POST', `/api/changes?${tz()}`, { change, id }),
   /** "Still on?" on a timed "if" task or event (spec §7). */

@@ -12,6 +12,7 @@ import { anthropicSorter, type SortChunk } from './ai';
 import { registerAnswers } from './answers';
 import { registerDrops } from './drops';
 import { autoPencil, registerPlan } from './plan';
+import { httpFeed, registerCanvas, type FetchFeed } from './canvas';
 import { registerChanges } from './changes';
 import { registerSessions } from './sessions';
 import { notFound, readBody, registerResources, type Run } from './resources';
@@ -25,13 +26,15 @@ export interface AppOptions {
   undo?: UndoStore;
   /** Sorts add-box text with the AI. Tests pass a fake. */
   sort?: SortChunk;
+  /** Gets the Canvas feed. Tests pass a saved sample. */
+  fetchFeed?: FetchFeed;
 }
 
 /**
  * The API. Reads take `?tz=` (the device's time zone), which is used when the time zone setting
  * is "auto". Without it, the home zone is used.
  */
-export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter() }: AppOptions) {
+export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed }: AppOptions) {
   const app = new Hono();
 
   /** Runs a change in one transaction and keeps its inverse for Undo. */
@@ -98,6 +101,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   registerPlan(app, db, run, now);
   registerSessions(app, db, run, now);
   registerChanges(app, db, run, now);
+  registerCanvas(app, db, run, now, fetchFeed);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {
