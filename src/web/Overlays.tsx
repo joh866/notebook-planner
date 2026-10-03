@@ -114,16 +114,28 @@ interface PopoverProps {
   onRemove: (b: Shown) => void;
   onPin: (b: Shown) => void;
   onStillOn: (b: Shown, yes: boolean) => void;
+  onStart: (taskId: string, title: string) => void;
+  onStop: (taskId: string, done: boolean) => void;
   onEditClass: (classId: string) => void;
   onClose: () => void;
 }
 
 /** A block's details and actions: Done, Skip, Pin or Unpin, Back to the list, Edit, and "Still on?" (spec §7). */
-export function Popover({ b, anchor, day, onCheck, onRemove, onPin, onStillOn, onEditClass, onClose }: PopoverProps) {
+export function Popover({ b, anchor, day, onCheck, onRemove, onPin, onStillOn, onStart, onStop, onEditClass, onClose }: PopoverProps) {
   const { ref, pos } = useFloating(anchor, 'side', onClose, [b]);
   const item = b.item;
   const acts: { label: string; run: () => void; primary?: boolean }[] = [];
   if (b.checkable) acts.push({ label: b.done ? 'Mark not done' : 'Mark done', run: () => onCheck(b), primary: true });
+  if (item.type === 'block' && item.kind === 'task' && item.taskId && !b.done) {
+    // Start and Stop (spec §10, "Actual time").
+    const taskId = item.taskId;
+    if (item.running) {
+      acts.push({ label: 'Stop', run: () => onStop(taskId, false) });
+      acts.push({ label: 'Done', run: () => onStop(taskId, true), primary: true });
+    } else {
+      acts.push({ label: 'Start', run: () => onStart(taskId, b.title) });
+    }
+  }
   if (item.type === 'block' && item.kind === 'task') acts.push({ label: item.pinned ? 'Unpin' : 'Pin here', run: () => onPin(b) });
   acts.push({ label: removeLabel(b), run: () => onRemove(b) });
   if (item.type === 'class') acts.push({ label: 'Edit', run: () => onEditClass(item.classId) });

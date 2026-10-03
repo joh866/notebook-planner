@@ -16,7 +16,9 @@ import { Month } from './Month';
 import { CatPicker, Popover, Toast, type ToastState } from './Overlays';
 import { Rail } from './Rail';
 import { Schedule, type Shown } from './Schedule';
+import { logMessage } from './logMessage';
 import { Settings } from './Settings';
+import { TimeLog } from './TimeLog';
 import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
 import { usePhone } from './usePhone';
 import { PhoneWeekChoice, Week, WeekList, type PhoneWeek } from './Week';
@@ -58,6 +60,7 @@ export function App() {
   /** The class dialog: a class id to edit, or 'new'. */
   const [classEdit, setClassEdit] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [timeLogOpen, setTimeLogOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   /** Cards the add box just made, which flash briefly (spec §11, "After adding"). */
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
@@ -154,7 +157,7 @@ export function App() {
   }, [view, phone]);
 
   // Escape closes the drawer, unless a popover, picker, or dialog is open (they close first).
-  const overlayOpen = !!(pop || catPick || classEdit || settingsOpen);
+  const overlayOpen = !!(pop || catPick || classEdit || settingsOpen || timeLogOpen);
   useEffect(() => {
     if (!phone || drawer === 'peek' || overlayOpen) return;
     const key = (e: KeyboardEvent) => {
@@ -241,6 +244,10 @@ export function App() {
     if (item.type === 'block' && item.taskId) return checkTask(item.taskId, !item.done);
     if (item.type === 'block') return act(() => api.setBlockDone(item.id, !item.done));
   };
+
+  /** Start and Stop (spec §10, "Actual time"). Done stops it, checks it off, and moves its block to when it happened. */
+  const startTask = (id: string, title: string) => void change(() => api.startTask(id), `Started “${title}”.`);
+  const stopTask = (id: string, done: boolean) => void change(() => api.stopTask(id, done), (r) => logMessage(r, data!.day.today, data!.day.zone));
 
   /** "Still on?" on a timed "if" item (spec §7). Yes makes it a normal item; No removes it, with Undo. */
   const stillOn = (b: Shown, yes: boolean) => {
@@ -414,6 +421,11 @@ export function App() {
     addStep: (taskId, title) => void change(() => api.addStep(taskId, title), null),
     removeStep: (st) => void change(() => api.deleteStep(st.id), `Removed the step “${st.title}”.`),
     saveNotes: (taskId, notes) => void change(() => api.patchTask(taskId, { notes }), null),
+    start: (t) => startTask(t.id, t.title),
+    stop: (t, done) => stopTask(t.id, done),
+    setEstimate: (t, estLow, estHigh) => void change(() => api.patchTask(t.id, { estLow, estHigh }),
+      estLow == null ? `Cleared the estimate for “${t.title}”.` : `“${t.title}” is about ${fmtDur(estLow, estHigh)} now. Noted for next time.`),
+    openTimeLog: () => setTimeLogOpen(true),
   };
 
   /** The add box: everything is added right away, with one Undo (spec §11). */
@@ -588,6 +600,8 @@ export function App() {
           onRemove={(b) => void removeBlock(b)}
           onPin={(b) => void pinBlock(b)}
           onStillOn={stillOn}
+          onStart={(taskId, title) => startTask(taskId, title)}
+          onStop={(taskId, done) => stopTask(taskId, done)}
           onEditClass={setClassEdit}
           onClose={closePop}
         />
@@ -611,8 +625,15 @@ export function App() {
           say={say}
           onEditClass={setClassEdit}
           onDayTimes={() => setOpened({ early: false, late: false })}
+          onTimeLog={() => {
+            closeSettings();
+            setTimeLogOpen(true);
+          }}
           onClose={closeSettings}
         />
+      )}
+      {timeLogOpen && (
+        <TimeLog zone={day.zone} today={day.today} categories={categories} change={change} onClose={() => setTimeLogOpen(false)} />
       )}
       {classEdit && (
         <ClassDialog

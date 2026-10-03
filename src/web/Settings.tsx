@@ -18,6 +18,8 @@ interface Props {
   onEditClass: (id: string | 'new') => void;
   /** Wake or bed time changed, so the folded hours start folded again. */
   onDayTimes: () => void;
+  /** Opens the time log (spec §13). */
+  onTimeLog: () => void;
   onClose: () => void;
 }
 
@@ -78,7 +80,7 @@ async function testNotification(say: (m: string) => void) {
 }
 
 /** The gear button's sheet (spec §13). Every change saves right away. */
-export function Settings({ settings: st, categories, covered, change, say, onEditClass, onDayTimes, onClose }: Props) {
+export function Settings({ settings: st, categories, covered, change, say, onEditClass, onDayTimes, onTimeLog, onClose }: Props) {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [canvas, setCanvas] = useState(st.canvasFeedUrl ?? '');
@@ -171,6 +173,14 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
           <div className="srow">
             <span className="grow">Usually asleep by</span>
             <TimePicker label="Usually asleep by" value={st.bedTime} onCommit={(v) => dayTime('bed', v)} />
+          </div>
+        </section>
+
+        <section>
+          <h3>Time log</h3>
+          <div className="srow">
+            <span className="grow sub2">What you finished, with the estimate next to how long it took.</span>
+            <button className="box boxbtn" onClick={onTimeLog}>Open</button>
           </div>
         </section>
 

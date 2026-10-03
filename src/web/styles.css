@@ -250,6 +250,16 @@ body[data-mode="night"] .tab.active .half:hover { background:rgba(255,255,255,.1
 .details .step { display:flex; align-items:center; gap:9px; padding:3px 0; font-size:13.5px; }
 .details .step .cb { width:15px; height:15px; margin:0; }
 .details .step span { flex:1; }
+.details .acts { display:flex; gap:6px; margin-bottom:6px; }
+.details .est { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); }
+.details .est input { width:72px; margin-top:0; }
+.card .run { display:flex; align-items:center; gap:6px; margin-top:4px; font-size:12px; color:var(--accent); font-weight:700; }
+.card .run .pill { padding:1px 9px; font-size:12px; }
+.timelog .entry { padding:10px 0 6px; }
+.timelog .entry .dot { width:9px; height:9px; border-radius:50%; background:var(--cat); flex:none; align-self:flex-start; margin-top:6px; }
+.timelog .session { padding:3px 0 3px 19px; }
+.timelog .mins { width:54px; }
+.linkish { border:0; background:none; padding:4px 0; color:var(--accent); font-size:13px; text-decoration:underline; cursor:pointer; }
 .details .step.done span { text-decoration:line-through; color:var(--muted); }
 .details .step:hover .del { opacity:.75; }
 .details input, .details textarea { width:100%; border:1px solid var(--card-border); background:var(--panel); border-radius:5px; padding:5px 8px; font-size:13.5px; margin-top:6px; }

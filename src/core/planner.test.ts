@@ -47,7 +47,7 @@ describe('free time', () => {
     });
     const blk = (id: string, kind: BlockItem['kind'], a: number, b: number): BlockItem => ({
       ...base, type: 'block', id, kind, title: id, taskId: null, startMin: a, endMin: b, durationMinutes: b - a, tentative: false, label: null,
-      location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null, condition: null, askNow: false, items: [],
+      location: null, pinned: true, reason: null, rolledFrom: null, done: false, missed: false, steps: [], nextStep: null, condition: null, askNow: false, items: [], logged: null, running: false,
     });
     const laundry: RoutineItem = {
       ...base, type: 'routine', id: 'l', slotId: 'l', routineId: 'l', title: 'Laundry', start: '10:00', durationMinutes: 140, changed: false,

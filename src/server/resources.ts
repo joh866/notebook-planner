@@ -3,6 +3,7 @@ import { eq, getTableColumns, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { Context, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import type { DateTime } from 'luxon';
 import type { z } from 'zod';
 import {
   BlockInputSchema,
@@ -84,6 +85,8 @@ interface ResourceSpec {
   /** Inserts nested rows (steps, slots) after the item itself. */
   children?: (tx: Tx, change: Change, item: Row, input: Row) => void;
   canDelete?: (row: Row) => string | null;
+  /** Adds fields to a partial update, like when an estimate was changed. */
+  onPatch?: (existing: Row, input: Row) => Row;
 }
 
 function resource(app: Hono, db: Db, run: Run, spec: ResourceSpec) {
@@ -143,8 +146,9 @@ function resource(app: Hono, db: Db, run: Run, spec: ResourceSpec) {
       if (!existing) throw notFound(what);
       invalid(spec.problem?.({ ...existing, ...input }) ?? null);
       if (!Object.keys(input).length) return existing;
+      const set = spec.onPatch ? { ...input, ...spec.onPatch(existing, input) } : input;
       change.before(name, [existing]);
-      tx.update(table).set(input as never).where(whereKey(name, existing)).run();
+      tx.update(table).set(set as never).where(whereKey(name, existing)).run();
       return byId(tx, existing.id as string)!;
     }));
   });
@@ -220,7 +224,7 @@ function dayToggle(app: Hono, run: Run, spec: {
   });
 }
 
-export function registerResources(app: Hono, db: Db, run: Run) {
+export function registerResources(app: Hono, db: Db, run: Run, now: () => DateTime) {
   resource(app, db, run, {
     name: 'categories', table: t.categories, path: 'categories', what: 'category',
     create: CategoryInputSchema, patch: CategoryPatchSchema,
@@ -235,6 +239,11 @@ export function registerResources(app: Hono, db: Db, run: Run) {
   resource(app, db, run, {
     name: 'tasks', table: t.tasks, path: 'tasks', what: 'task',
     create: TaskInputSchema, patch: TaskPatchSchema, problem: taskProblem,
+    // A changed estimate is remembered, so the add box can learn from it (spec §10, "Better estimates").
+    onPatch: (existing, input) => {
+      const changed = ('estLow' in input && input.estLow !== existing.estLow) || ('estHigh' in input && input.estHigh !== existing.estHigh);
+      return changed ? { estEditedAt: now().toUTC().toISO({ suppressMilliseconds: true }) } : {};
+    },
     children: (tx, change, task, input) => {
       const steps = (input.steps as Row[] | undefined) ?? [];
       insert(tx, change, 'taskSteps', t.taskSteps, steps.map((s, i) => ({ id: randomUUID(), sortOrder: i, ...s, taskId: task.id })));

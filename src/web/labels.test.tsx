@@ -36,6 +36,8 @@ async function load() {
   // A "Quick things" block from the planner.
   await send('POST', '/api/tasks', { title: 'Text Sam back', window: 'near', estLow: 5, estHigh: 5, quick: true });
   await send('POST', `/api/plan?tz=${CHI}`, { date: DAY });
+  // A logged block: the reading, done 1:05–1:20pm.
+  await send('POST', `/api/tasks/response/log?tz=${CHI}`, { startAt: '2026-10-05T18:05:00Z', minutes: 15, done: true });
   const tz = `?tz=${CHI}`;
   return {
     day: await get<DayView>(`/api/day/${DAY}${tz}`),
@@ -85,6 +87,7 @@ describe('labels', () => {
     // The page shows afternoon times, in 12-hour form.
     expect(html).toContain('2:45');
     expect(html).toContain('Quick things');
+    expect(html).toContain('15 min (estimated');
     expect(html).toContain('pm');
     const text = readable(`${html}\n${popovers}`);
     expect(text.match(TWENTY_FOUR)?.[0] ?? null).toBeNull();

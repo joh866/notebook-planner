@@ -78,7 +78,12 @@ export function shown(item: ScheduleItem, today: string): Shown {
       categoryId: item.categoryId, done: item.done, checkable: true,
     };
   }
-  const sub = item.missed
+  // A logged block shows the actual length next to the estimate: "3:46–5:08pm, 82 min (estimated 75)".
+  const sub = item.logged
+    ? `${range}, ${item.logged.minutes} min${item.logged.estimate ? ` (estimated ${item.logged.estimate})` : ''}`
+    : item.running
+    ? `${range}. Running now`
+    : item.missed
     ? `${range}. Not done yet`
     : [range, item.nextStep && `Next: ${item.nextStep}`, item.rolledFrom && `From ${relWord(today, item.rolledFrom)}`].filter(Boolean).join('. ');
   return {

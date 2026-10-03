@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 13d.
+Step 13e.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -96,7 +96,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
     - Add the night routine's steps.
     - Add the Supplements routine.
   - **Quick things:** a `quick` flag (15 minutes or less). The planner batches quick tasks into one "Quick things" block, and a short task dropped onto that block joins the batch.
-- [ ] **13d. Actual time and the time log** (spec §10).
+- [x] **13d. Actual time and the time log** (spec §10).
   - Sessions with a start and an end.
   - Start and Stop on blocks and cards.
   - Logged blocks at the time they actually happened, and trimming a past event they overlap.
@@ -188,4 +188,24 @@ Agents add short notes here when a step is done.
     - In `app.test`: the Daily lists (Friday and Saturday); "checks a routine off with a streak" now checks the gratitude step; "puts a routine on the schedule with a new time" and "marks a routine skipped" use Supplements.
     - `drops.test`: "puts a checklist routine on the schedule" uses Supplements.
   - New tests: step propagation (`app.test`), the routine migration (`migrate-v0.4.test`), `core/length.test.ts`, Quick things in `planner.test`, `server/quick.test.ts`, the batch drop rules (`drag.test`), and a quick block in `labels.test`.
+- Step 13d:
+  - **Data.** Migration `0007` adds the `task_sessions` table (task, start, end; no end while running), `blocks.session_id` (a logged block), and `tasks.est_edited_at`. drizzle-kit leaves `ON DELETE set null` out of `ALTER TABLE`, and the running dev server applied `0007` to `data/planner.db` before the hand fix. So in the real database, `blocks.session_id` has no delete action. The app clears that link itself before deleting a session, so both behave the same. Watch for this in later migrations: write the SQL fix before saving any file the server imports.
+  - **Core.** `core/sessions.ts`: `sessionMinutes` (a running session counts to now), `loggedMinutes`, and `trimmedEvents` (an event that started before the session and was still going ends when you switched). `remainingMinutes` subtracts time already spent, for the capacity warning.
+  - **Server** (`server/sessions.ts`).
+    - Endpoints:
+      - `POST /api/tasks/:id/start`: one session runs at a time, so starting stops any other.
+      - `POST /api/tasks/:id/stop` with `{ done }`.
+      - `POST /api/tasks/:id/log` with `{ startAt, minutes or endAt, done }`. `logTime` is exported for the add box in 13e.
+      - The time log: `GET /api/time-log` (newest first) and `POST /api/tasks/:id/sessions`.
+      - `PATCH` and `DELETE /api/task-sessions/:id`. Editing a session moves its logged block.
+    - Finishing with a time checks the task off and moves its block that day (the one nearest the session) to when it happened, pinned and logged. Its other upcoming blocks are deleted, it leaves any Quick things block and the Sometime lane, and trimmed events get their new end. Each is one change with one Undo, and the result lists the trims.
+    - Cards get `running` and `loggedMinutes`. Blocks get `logged` (minutes, plus the estimate: sitting, session, or the middle of the range) and `running`.
+    - A PATCH that changes `estLow` or `estHigh` sets `estEditedAt` (a new `onPatch` hook on resources).
+  - **Web.**
+    - Start is on an open card and in a task block's popover. While running, the card shows "Started 3:46pm" with Stop and Done, and the popover has Stop and Done too.
+    - `logMessage` (tested) says "Marked “Read The Muqaddimah” done, 3:46–5:08pm (82 min). Ended RSO fair at 3:46pm." Logged blocks read "3:46–5:08pm, 82 min (estimated 75)".
+    - An open card has estimate fields, with a toast "Noted for next time."
+    - `TimeLog.tsx` is a sheet opened from "Time log" under Done and from Settings. Each entry shows the estimate next to the actual time (or the rough answer). Sessions can be edited (start, with the 12-hour picker, and minutes), deleted, or added.
+    - Choices: partial progress records a session but doesn't move or add a block, and the card says "40m done so far". The rough "How long did it take?" answer stays as it was.
+  - No existing tests changed. New: `core/sessions.test.ts`, `server/sessions.test.ts` (the spec's 3:46pm example with the RSO fair trimmed, then Undo), `web/logMessage.test.ts`, and a logged block in `labels.test`.
 

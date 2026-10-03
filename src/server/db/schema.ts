@@ -68,6 +68,8 @@ export const tasks = sqliteTable('tasks', {
   decisionYes: text('decision_yes', { mode: 'json' }).$type<DecisionYes>(),
   doneAt: text('done_at'),
   durationFeedback: text('duration_feedback', { enum: opts(DurationFeedbackSchema) }),
+  /** When you last changed the estimate yourself. The add box learns from these (spec §10, "Better estimates"). */
+  estEditedAt: text('est_edited_at'),
   /** Marked quick by the add box (a text, an email, a tiny chore). Anything estimated at 15 minutes or less counts too (spec §10). */
   quick: integer('quick', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
@@ -111,6 +113,15 @@ export const routineChecks = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.routineId, t.date] })],
 );
+
+/** Time actually spent on a task (spec §10, "Actual time and the time log"). No end while it's running. */
+export const taskSessions = sqliteTable('task_sessions', {
+  id: id(),
+  taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  startAt: text('start_at').notNull(),
+  endAt: text('end_at'),
+  createdAt: createdAt(),
+});
 
 /** Steps of a routine, like laundry's wash and dry cycles. Same shape as task steps. */
 export const routineSteps = sqliteTable('routine_steps', {
@@ -200,6 +211,8 @@ export const blocks = sqliteTable('blocks', {
   rolledFrom: text('rolled_from'),
   /** For events. Task blocks use the task's doneAt. */
   done: integer('done', { mode: 'boolean' }).notNull().default(false),
+  /** A logged block: the session it shows, at the time it actually happened. */
+  sessionId: text('session_id').references(() => taskSessions.id, { onDelete: 'set null' }),
   /** Conditions on an event, as on tasks. Task blocks use their task's. */
   conditionId: text('condition_id').references(() => conditions.id, { onDelete: 'set null' }),
   afterTaskId: text('after_task_id').references((): AnySQLiteColumn => tasks.id, { onDelete: 'set null' }),

@@ -22,6 +22,13 @@ export interface TaskActions {
   addStep: (taskId: string, title: string) => void;
   removeStep: (step: StepView) => void;
   saveNotes: (taskId: string, notes: string | null) => void;
+  /** Start, Stop, or finish a running session (spec §10, "Actual time"). */
+  start: (t: TaskCard) => void;
+  stop: (t: TaskCard, done: boolean) => void;
+  /** A changed estimate is remembered (spec §10, "Better estimates"). */
+  setEstimate: (t: TaskCard, low: number | null, high: number | null) => void;
+  /** Opens the time log (spec §10). */
+  openTimeLog: () => void;
 }
 
 interface Props {
@@ -122,6 +129,7 @@ export function TaskPanel({ day, categories, filter, showDone, openId, onFilter,
               </button>
             </h2>
             {showDone && done.map(card)}
+            <button className="linkish" onClick={actions.openTimeLog}>Time log</button>
           </div>
         )}
       </div>
@@ -311,6 +319,7 @@ function detailBits(t: TaskCard, day: DayView): { when: string | null; rest: str
     rest.push(`About ${fmtDur(t.estLow, t.estHigh)}`);
   }
   if (t.steps.length) rest.push(`${t.steps.filter((s) => s.done).length} of ${t.steps.length} steps`);
+  if (t.loggedMinutes && !t.doneAt) rest.push(`${fmtDur(t.loggedMinutes)} done so far`);
   if (t.notes) rest.push('Has notes');
   return { when, rest };
 }
@@ -431,6 +440,13 @@ function Card({ t, day, categories, open, fresh, onToggle, actions, begin }: Car
         </div>
         {t.condition && <div className="m cond">{t.condition.text}</div>}
         {t.meta && <div className="m">{t.meta}</div>}
+        {t.running && (
+          <div className="run" role="status">
+            <span>Started {fmtTime(momentOn(t.running.startAt, day.zone).min)}</span>
+            <button className="pill" onClick={() => actions.stop(t, false)}>Stop</button>
+            <button className="pill primary" onClick={() => actions.stop(t, true)}>Done</button>
+          </div>
+        )}
         {(when || rest.length > 0) && (
           <div className="e">
             {when && <span className="when">{when}</span>}
@@ -461,12 +477,33 @@ function Card({ t, day, categories, open, fresh, onToggle, actions, begin }: Car
 function Details({ t, actions }: { t: TaskCard; actions: TaskActions }) {
   const [step, setStep] = useState('');
   const [notes, setNotes] = useState(t.notes ?? '');
+  const [est, setEst] = useState({ low: t.estLow?.toString() ?? '', high: t.estHigh?.toString() ?? '' });
   const saveNotes = () => {
     const v = notes.trim() ? notes : null;
     if (v !== (t.notes ?? null)) actions.saveNotes(t.id, v);
   };
+  const minutes = (s: string) => (/^\d+$/.test(s.trim()) && Number(s) > 0 ? Number(s) : null);
+  const saveEstimate = () => {
+    let low = minutes(est.low);
+    let high = minutes(est.high) ?? low;
+    if (low != null && high != null && low > high) [low, high] = [high, low];
+    if (low !== t.estLow || high !== t.estHigh) actions.setEstimate(t, low, high);
+  };
   return (
     <div className="details">
+      {!t.doneAt && !t.running && t.window !== 'decide' && (
+        <div className="acts">
+          <button className="pill" onClick={() => actions.start(t)}>Start</button>
+        </div>
+      )}
+      <div className="lab">Estimate, in minutes</div>
+      <div className="est" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && saveEstimate()}>
+        <input inputMode="numeric" aria-label="Estimate, low" value={est.low} placeholder="Low" onChange={(e) => setEst({ ...est, low: e.target.value })}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+        <span>to</span>
+        <input inputMode="numeric" aria-label="Estimate, high" value={est.high} placeholder="High" onChange={(e) => setEst({ ...est, high: e.target.value })}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+      </div>
       <div className="lab">Steps</div>
       <div className="steps">
         {t.steps.map((s) => (

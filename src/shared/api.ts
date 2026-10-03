@@ -235,6 +235,51 @@ export const DropInputSchema = z.discriminatedUnion('action', [
 ]);
 export type DropInput = z.infer<typeof DropInputSchema>;
 
+/** Time spent on a task (spec §10): a start, and an end or a length. `done` finishes the task too. */
+export const LogInputSchema = z.strictObject({
+  startAt: InstantSchema,
+  endAt: InstantSchema.optional(),
+  minutes: Minutes.optional(),
+  done: z.boolean().optional(),
+}).refine((x) => x.endAt || x.minutes, 'Give an end or a length');
+export const StopInputSchema = z.strictObject({ done: z.boolean().optional() });
+export const SessionPatchSchema = z.strictObject({ startAt: InstantSchema.optional(), endAt: InstantSchema.nullish() });
+
+export interface SessionView {
+  id: string;
+  taskId: string;
+  startAt: string;
+  /** Null while it's running. */
+  endAt: string | null;
+}
+
+/** What reporting time did, so the message can list every change (spec §10). */
+export interface LogResult {
+  taskId: string;
+  title: string;
+  session: SessionView;
+  minutes: number;
+  done: boolean;
+  /** Where its block moved, when it was finished. */
+  block: { id: string; startAt: string; endAt: string } | null;
+  /** Events that now end when you switched. */
+  trimmed: { id: string; title: string; endAt: string }[];
+}
+
+/** GET /api/time-log: a finished task with its estimate and actual time. */
+export interface TimeLogEntry {
+  taskId: string;
+  title: string;
+  categoryId: string | null;
+  doneAt: string;
+  estLow: number | null;
+  estHigh: number | null;
+  /** Null when no time was recorded. */
+  actualMinutes: number | null;
+  durationFeedback: 'as_planned' | 'longer' | 'shorter' | null;
+  sessions: SessionView[];
+}
+
 /** The add box (spec §11): anything from one line to a whole pasted list. */
 export const AddInputSchema = z.strictObject({ text: z.string().trim().min(1).max(50_000) });
 
@@ -348,6 +393,10 @@ export interface TaskCard {
   sessionMinutes: number | null;
   /** 15 minutes or less, or marked quick: it can go in a "Quick things" block (spec §10). */
   quick: boolean;
+  /** Its running session, if Start was pressed. */
+  running: { sessionId: string; startAt: string } | null;
+  /** Minutes recorded so far (spec §10, "Partial progress"). */
+  loggedMinutes: number;
   conditionId: string | null;
   /** Its "if" or "after" condition while it holds, shown in look C (spec §10, "Conditions"). */
   condition: ConditionView | null;
@@ -456,6 +505,10 @@ export interface BlockItem extends Placed {
   nextStep: string | null;
   /** The tasks in a "Quick things" block (spec §10). Empty for other blocks. */
   items: QuickItemView[];
+  /** A logged block shows actual time: its length and the estimate it had (spec §7). */
+  logged: { minutes: number; estimate: number | null } | null;
+  /** Its task's session is running. */
+  running: boolean;
 }
 
 export interface QuickItemView {

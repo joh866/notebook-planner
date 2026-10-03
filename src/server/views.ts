@@ -3,6 +3,7 @@ import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
 import { deadlineName } from '../core/classes';
 import { blockLength, isQuick, quickLength } from '../core/length';
+import { loggedMinutes, sessionMinutes } from '../core/sessions';
 import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask, type Prereq } from '../core/planner';
 import { classesOn, routineOccursOn, slotOn } from '../core/recurrence';
 import { streak } from '../core/streak';
@@ -55,6 +56,7 @@ function load(db: Db) {
     blocks: db.select().from(t.blocks).all(),
     sometime: db.select().from(t.sometime).all(),
     quickItems: db.select().from(t.quickItems).orderBy(t.quickItems.sortOrder).all(),
+    sessions: db.select().from(t.taskSessions).orderBy(t.taskSessions.startAt).all(),
   };
 }
 type Data = ReturnType<typeof load>;
@@ -186,6 +188,14 @@ function taskSlots(ctx: Ctx) {
   return out;
 }
 
+/** A logged block's actual length, next to the estimate it had (spec §7, "Logged task"). */
+function loggedOf(ctx: Ctx, b: Rows<typeof t.blocks>[number], task: Rows<typeof t.tasks>[number] | undefined): BlockItem['logged'] {
+  const s = b.sessionId ? ctx.data.sessions.find((x) => x.id === b.sessionId) : undefined;
+  if (!s) return null;
+  const estimate = task ? (task.sittingMinutes ?? task.sessionMinutes ?? (task.estLow != null && task.estHigh != null ? Math.round((task.estLow + task.estHigh) / 2) : task.estLow ?? task.estHigh)) : null;
+  return { minutes: sessionMinutes(s, ctx.now), estimate: estimate ?? null };
+}
+
 /** The tasks in a "Quick things" block, in order. */
 function quickItemsOf(ctx: Ctx, blockId: string): QuickItemView[] {
   return ctx.data.quickItems.filter((q) => q.blockId === blockId).flatMap((q) => {
@@ -193,6 +203,9 @@ function quickItemsOf(ctx: Ctx, blockId: string): QuickItemView[] {
     return task ? [{ taskId: task.id, title: task.title, categoryId: task.categoryId, done: !!task.doneAt, minutes: quickLength(task) }] : [];
   });
 }
+
+const sessionsOf = (ctx: Ctx, taskId: string) => ctx.data.sessions.filter((x) => x.taskId === taskId);
+const runningOf = (ctx: Ctx, taskId: string) => ctx.data.sessions.find((x) => x.taskId === taskId && !x.endAt);
 
 function blockItem(ctx: Ctx, b: Rows<typeof t.blocks>[number], date: string): BlockItem {
   const task = b.taskId ? ctx.data.tasks.find((x) => x.id === b.taskId) : undefined;
@@ -209,6 +222,8 @@ function blockItem(ctx: Ctx, b: Rows<typeof t.blocks>[number], date: string): Bl
     tentative: b.tentative, label: b.label, location: b.location, pinned: b.pinned, reason: b.reason, rolledFrom: b.rolledFrom,
     done, missed: (b.kind === 'task' || b.kind === 'quick') && !done && ended && date === ctx.today,
     steps, nextStep: steps.find((s) => !s.done)?.title ?? null, items,
+    logged: loggedOf(ctx, b, task),
+    running: !!task && !!runningOf(ctx, task.id),
     condition, askNow: condition?.kind === 'if' && !done && start <= ctx.now,
   };
 }
@@ -282,7 +297,12 @@ function taskCard(ctx: Ctx, task: Rows<typeof t.tasks>[number], slots: ReturnTyp
     effectiveWindow: effectiveWindow(task, ctx.now, ctx.zone, ctx.homeZone),
     dueAt: task.dueAt, dueDate: task.dueDate, dueTone: dueTone(task, ctx.now, ctx.zone, ctx.homeZone),
     shortName: task.shortName, estLow: task.estLow, estHigh: task.estHigh, sittingMinutes: task.sittingMinutes,
-    sessionMinutes: task.sessionMinutes, quick: isQuick(task), conditionId: task.conditionId, condition: task.doneAt ? null : conditionOf(ctx, task), decisionYes: task.decisionYes ?? null, doneAt: task.doneAt,
+    sessionMinutes: task.sessionMinutes, quick: isQuick(task),
+    running: (() => {
+      const r = runningOf(ctx, task.id);
+      return r ? { sessionId: r.id, startAt: r.startAt } : null;
+    })(),
+    loggedMinutes: loggedMinutes(sessionsOf(ctx, task.id), ctx.now), conditionId: task.conditionId, condition: task.doneAt ? null : conditionOf(ctx, task), decisionYes: task.decisionYes ?? null, doneAt: task.doneAt,
     steps: stepsOf(ctx, task.id),
     scheduled: block ? { startAt: block.startAt } : some && some.date >= ctx.today ? { sometime: some.date } : null,
   };
@@ -339,6 +359,7 @@ function planning(ctx: Ctx) {
       sometime: some ? { date: some.date, rolledFrom: some.rolledFrom } : null,
       scheduled: slots.some((x) => x.taskId === task.id && !skip.has(x.blockId) && slotEnds(x) > ctx.now),
       quick: isQuick(task),
+      loggedMinutes: loggedMinutes(sessionsOf(ctx, task.id), ctx.now),
       ifPending: !!openQuestion(ctx, task.conditionId),
       after: prereqOf(task, skip),
     };

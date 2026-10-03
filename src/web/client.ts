@@ -3,7 +3,10 @@ import type {
   AgendaView,
   CategoryView,
   ConditionAnswer,
+  LogResult,
+  SessionView,
   StillOnResult,
+  TimeLogEntry,
   DayView,
   DecisionResult,
   DropInput,
@@ -98,7 +101,7 @@ export const api = {
   /** The answer to "How long did it take?" (spec §10). */
   setDurationFeedback: (id: string, feedback: 'as_planned' | 'longer' | 'shorter') =>
     send<Changed>('PATCH', `/api/tasks/${id}`, { durationFeedback: feedback }),
-  patchTask: (id: string, body: { notes?: string | null; categoryId?: string | null }) => send<Changed>('PATCH', `/api/tasks/${id}`, body),
+  patchTask: (id: string, body: { notes?: string | null; categoryId?: string | null; estLow?: number | null; estHigh?: number | null }) => send<Changed>('PATCH', `/api/tasks/${id}`, body),
   deleteTask: (id: string) => send<Changed>('DELETE', `/api/tasks/${id}`),
   decide: (id: string, yes: boolean) => send<Changed<DecisionResult>>('POST', `/api/tasks/${id}/decide`, { yes }),
 
@@ -115,6 +118,13 @@ export const api = {
   patchSettings: (body: SettingsPatch) => send<Changed<SettingsView>>('PATCH', '/api/settings', body),
 
   answerCondition: (id: string) => send<Changed<ConditionAnswer>>('POST', `/api/conditions/${id}/answer`),
+  // Actual time (spec §10).
+  startTask: (id: string) => send<Changed<SessionView>>('POST', `/api/tasks/${id}/start`),
+  stopTask: (id: string, done: boolean) => send<Changed<LogResult>>('POST', `/api/tasks/${id}/stop?${tz()}`, { done }),
+  timeLog: () => send<TimeLogEntry[]>('GET', '/api/time-log'),
+  addSession: (taskId: string, startAt: string, minutes: number) => send<Changed<SessionView>>('POST', `/api/tasks/${taskId}/sessions`, { startAt, minutes }),
+  patchSession: (id: string, body: { startAt?: string; endAt?: string }) => send<Changed<SessionView>>('PATCH', `/api/task-sessions/${id}`, body),
+  deleteSession: (id: string) => send<Changed>('DELETE', `/api/task-sessions/${id}`),
   /** "Still on?" on a timed "if" task or event (spec §7). */
   stillOn: (kind: 'tasks' | 'blocks', id: string, yes: boolean) => send<Changed<StillOnResult>>('POST', `/api/${kind}/${id}/still-on`, { yes }),
   snoozeCondition: (id: string, until: string) => send<Changed>('PATCH', `/api/conditions/${id}`, { snoozedUntil: until }),

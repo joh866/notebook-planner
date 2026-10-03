@@ -132,6 +132,8 @@ export interface PlanTask {
   after: Prereq | null;
   /** A quick task goes in a "Quick things" block (spec §10). */
   quick?: boolean;
+  /** Time already spent on it (spec §10, "Partial progress"). */
+  loggedMinutes?: number;
 }
 
 /** What an "after" item comes after (spec §10, "Conditions"). */
@@ -358,11 +360,14 @@ function placeQuick(t: PlanTask, day: DayFree, limit: number): Pick<Placement, '
   return { startMin: at, minutes: len, batch: [t.id] };
 }
 
-/** About how much work is left on a task: the middle of its estimate (or 30 minutes), less finished steps. */
-export function remainingMinutes(t: Pick<PlanTask, 'estLow' | 'estHigh' | 'steps'>): number {
+/**
+ * About how much work is left on a task: the middle of its estimate (or 30 minutes), less finished
+ * steps, less time already spent on it.
+ */
+export function remainingMinutes(t: Pick<PlanTask, 'estLow' | 'estHigh' | 'steps' | 'loggedMinutes'>): number {
   const base = t.estLow != null && t.estHigh != null ? (t.estLow + t.estHigh) / 2 : (t.estLow ?? t.estHigh ?? 30);
-  if (!t.steps.length) return base;
-  return base * (1 - t.steps.filter((s) => s.done).length / t.steps.length);
+  const left = t.steps.length ? base * (1 - t.steps.filter((s) => s.done).length / t.steps.length) : base;
+  return Math.max(0, left - (t.loggedMinutes ?? 0));
 }
 
 export interface Capacity {
