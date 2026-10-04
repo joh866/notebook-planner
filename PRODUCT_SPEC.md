@@ -1,6 +1,6 @@
 # Product spec: personal planner
 
-Version 0.7, October 9, 2026. This replaces the September 25 spec from the first attempt.
+Version 0.7, October 3, 2026. This replaces the September 25 spec from the first attempt.
 This file is the source of truth. The latest prototype (`planner-prototype-6.html`) is the visual reference. Where the two disagree, this file wins.
 
 ---
@@ -706,10 +706,10 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
 - **Oct 3, 2026:** v0.7. Going online (§3, step 14): one-person password sign-in that lasts 90 days per device, Sign out in Settings (§13), and DNS on Cloudflare as a DNS-only record with Caddy getting the certificate.
-- **Oct 9, 2026:** v0.7. A prerequisite inherits the deadline urgency of whatever waits on it (§12).
-- **Oct 9, 2026:** v0.7. Themes come in day and night pairs: Notebook, Sleek, Glass, Mono, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk, with exact values from the theme samples. Settings picks a day theme and a night theme separately, and a day theme pre-fills its partner. Six palettes come from Candela (MIT), so its license notice is in the repo.
-- **Oct 9, 2026:** v0.6. Themes: Notebook and Sleek. Conditions use look C.
-- **Oct 9, 2026:** v0.5. Notes from using the app (step 13).
+- **Oct 3, 2026:** v0.7. A prerequisite inherits the deadline urgency of whatever waits on it (§12).
+- **Oct 3, 2026:** v0.7. Themes come in day and night pairs: Notebook, Sleek, Glass, Mono, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk, with exact values from the theme samples. Settings picks a day theme and a night theme separately, and a day theme pre-fills its partner. Six palettes come from Candela (MIT), so its license notice is in the repo.
+- **Oct 3, 2026:** v0.6. Themes: Notebook and Sleek. Conditions use look C.
+- **Oct 3, 2026:** v0.5. Notes from using the app (step 13).
   - Classes are never deadlines. Times are always 12-hour. Nothing lands in the past, and "today" after midnight means the coming day.
   - The Sometime lane rule.
   - Conditions ("if" and "after") are properties, and the Waiting group became the Check-ins strip.

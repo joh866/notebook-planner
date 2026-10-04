@@ -69,7 +69,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - The capacity warning.
   - The "how long did it take?" prompt.
 - [x] **12. Settings sheet** (spec §13), including automatic night mode and the time zone setting.
-- [x] **13. Use it daily for a week.** The first round of notes (Oct 9) became steps 13a–13g and spec v0.5.
+- [x] **13. Use it daily for a week.** The first round of notes (Oct 3) became steps 13a–13g and spec v0.5.
 - [x] **13a. Fixes from daily use.**
   - **Classes are never deadlines** (spec §6 and §11). The header showed "ECON … due at 11:00am" at the class's start. Find where that came from (the data, the parser, or the deadline lines), fix it, and add a test.
   - **12-hour times everywhere** (spec §4).
@@ -165,6 +165,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
     - The status bar color follows the theme.
   - Removed the `server.host: '0.0.0.0'` dev workaround. Spec v0.7 change log updated (§3, §13).
   - Tests: new `src/server/auth.test.ts` covers hashing, tokens, env reading, `.env` editing, the API locked without a cookie, sign-in, renewal and expiry, the wrong-password limit, sign-out, open localhost, and static serving. No existing test changed. Checked by hand in the browser against a production build: the sign-in screen at 390px and desktop, a wrong password, sign-in, the service worker, a deep link, and Sign out.
+  - **Live:** https://planner.getclearpages.com. The user signed in, added it to the phone's home screen, and tested the Backblaze B2 backup. From here on, every step ends with a commit, a push, and `npm run deploy`. The droplet's database is the real one, and only the deploy script touches it.
 - [ ] **15. Notifications** (spec §13 list) through web push.
 - [ ] **16. Google Calendar** (spec §14): sign-in and reading events first, then optional write-back.
 - [x] **17. Canvas calendar feed.** Moved to 13f.
