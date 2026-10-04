@@ -582,7 +582,7 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
 - **Weekly classes:** a list with Edit, plus "Add a weekly class." A class has a name, type, full name, days, start and end time, and location.
 - **Categories:** rename, recolor custom ones, create new ones. Shows the task count for each.
 - **Connections:**
-  - Google Calendar (Connect).
+  - Google Calendar: Connect, then the calendars to show, "Send planned blocks to Google," Sync now, and Disconnect (section 14).
   - Canvas calendar feed (paste the link).
 - **Notifications:** each one can be switched on or off. Plus a test button.
   - Before each class (10 minutes before).
@@ -599,11 +599,19 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
 
 ### Google Calendar
 
-The real build uses Google sign-in (OAuth) and the Google Calendar API. No file import.
-- **Read:** show Google events on the schedule.
-- **Optionally write:** send planned blocks to a "Planner" calendar.
+The real build uses Google sign-in (OAuth) and the Google Calendar API. No file import. The one-time setup is in `GOOGLE.md`.
+- **Read:** show Google events on the schedule. Settings lists your calendars with a checkbox each. Your main calendar, and the ones shown in Google Calendar's own list, start on.
+  - The server syncs on start, every 15 minutes, and on Sync now. It reads from two weeks back to four months ahead.
+  - Timed events are blocks on the schedule. All-day events are chips in the Sometime lane and the week's all-day row. Both show in the month view and Coming up.
+  - Events can't be moved, checked, or removed here. Tapping one shows its details and "Open in Google."
+  - The planner treats them as busy, except events marked "Free" in Google. Cancelled events and ones you declined are left out.
+- **Optionally write (off by default):** send planned blocks to a "Planner" calendar the app makes. These are task blocks, "Quick things," and events made in the app, from yesterday to a month ahead.
+  - Only changes go out: after a sync, and about 20 seconds after a change in the app.
+  - Turning it off, or disconnecting, takes those events back off Google. The Planner calendar itself isn't read.
+  - The permissions asked for are reading calendars, and changing only calendars the app made (`calendar.readonly`, `calendar.app.created`).
 - **Imported events:** shown in gray, and updated rather than duplicated on each sync.
-- **Note for the build:** a Google Cloud project in "Testing" mode issues sign-ins that expire after 7 days for calendar access. Plan to publish the app for personal use.
+- **The sign-in:** Google's lasting sign-in is kept in the database on the server, and never sent to the browser. If Google ends it, Settings says so and offers Connect again. Disconnect ends it with Google and removes Google events from the app.
+- **Note for the build:** a Google Cloud project in "Testing" mode issues sign-ins that expire after 7 days for calendar access. The app is published for personal use (`GOOGLE.md`, step 5).
 
 ### Canvas
 
@@ -701,13 +709,13 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 7. Whether 15 minutes is the right cutoff for "quick," and 30 minutes the right size for a batch.
 2. Which online host to use. Decided at the "go online" step.
 3. Whether to keep the left rail's mini month and Coming up list, or use that space differently.
-4. Whether Google Calendar should be read-only at first, or also receive planned blocks.
 
 ## Change log
 
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 4, 2026:** v0.7. Google Calendar (§13, §14): which calendars are read and how often, all-day events in the Sometime lane, "Free" events not busy, write-back off by default and taken back off when turned off, the two permissions, and where the sign-in is kept. Open question 4 is decided: read, with optional write-back.
 - **Oct 4, 2026:** v0.7. Notifications (§13, §14): the exact times of each kind, per-device on and off, and the time zone they follow.
 - **Oct 3, 2026:** v0.7. Going online (§3, step 14): one-person password sign-in that lasts 90 days per device, Sign out in Settings (§13), and DNS on Cloudflare as a DNS-only record with Caddy getting the certificate.
 - **Oct 3, 2026:** v0.7. A prerequisite inherits the deadline urgency of whatever waits on it (§12).

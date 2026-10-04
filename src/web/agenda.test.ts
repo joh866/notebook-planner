@@ -5,7 +5,7 @@ import { agendaDayLabel, agendaLines, monthDots } from './agenda';
 const event = (over: Partial<BlockItem>) => ({ id: 'e', kind: 'event', title: 'RSO fair', startMin: 900, tentative: false, categoryId: 'life', ...over }) as BlockItem;
 const skipped = { id: 'econ-disc@2026-10-02', code: 'ECON 20010', kind: 'Discussion', startMin: 810, categoryId: 'class' } as ClassItem;
 
-const day = (over: Partial<MonthDay>): MonthDay => ({ date: '2026-10-02', deadlines: [], events: [], chores: [], skippedClasses: [], ...over });
+const day = (over: Partial<MonthDay>): MonthDay => ({ date: '2026-10-02', deadlines: [], events: [], chores: [], skippedClasses: [], google: [], ...over });
 
 describe('agendaLines', () => {
   it('lists deadlines, events, and skipped classes in time order, with day-only deadlines last', () => {

@@ -23,7 +23,7 @@ import { Check, Del, PencilIcon, PinIcon, PlusIcon, RepeatIcon } from './icons';
 export interface Shown {
   key: string;
   item: ScheduleItem;
-  look: 'class' | 'skipped' | 'routine' | 'event' | 'tentative' | 'open' | 'task' | 'quick';
+  look: 'class' | 'skipped' | 'routine' | 'event' | 'tentative' | 'open' | 'task' | 'quick' | 'google';
   startMin: number;
   endMin: number;
   title: string;
@@ -63,6 +63,10 @@ export function shown(item: ScheduleItem, today: string): Shown {
       checkable: true, recurring: true, pinned: item.changed, parts: stepParts(item.startMin, item.steps),
     };
   }
+  if (item.type === 'google') {
+    // Read from Google Calendar (spec §14): gray, and changed in Google rather than here.
+    return { ...base, look: 'google', title: item.title, sub: [range, shortLoc(item.location)].filter(Boolean).join(', '), categoryId: null, done: false, checkable: false };
+  }
   if (item.kind === 'open') {
     return { ...base, look: 'open', title: item.title ?? 'Open time', sub: item.label ?? range, categoryId: item.categoryId, done: false, checkable: false };
   }
@@ -97,6 +101,7 @@ export function removeLabel(b: Shown): string {
   const item = b.item;
   if (item.type === 'class') return item.skipped ? 'Not skipping' : 'Skip this one';
   if (item.type === 'routine') return 'Skip this day';
+  if (item.type === 'google') return '';
   return item.kind === 'task' || item.kind === 'quick' ? 'Back to the list' : 'Remove';
 }
 
@@ -171,6 +176,12 @@ export function Schedule({ day, settings, categories, nowMin, opened, onOpen, on
               {s.rolledFrom && <em className="from">from {relWord(day.today, s.rolledFrom)}</em>}
               {s.due ? <em className="from">due</em> : <Del label={`Back to the list: ${s.title}`} onClick={() => onClearSometime(s.taskId)} />}
             </div>
+          ))}
+          {day.allDay.map((e) => (
+            <a key={e.id} className="chip google" href={e.link ?? undefined} target="_blank" rel="noreferrer" title={`${e.calendar}, in Google Calendar`}>
+              <i className="dot"></i>
+              <span>{e.title}</span>
+            </a>
           ))}
         </div>
         {target && (
@@ -353,7 +364,7 @@ function Block({ b, col, cols, y, categories, onCheck, onDetails, onRemove, onSt
           <button onClick={() => onStillOn(b, false)}>No</button>
         </div>
       )}
-      <Del label={`${removeLabel(b)}: ${b.title}`} onClick={() => onRemove(b)} />
+      {b.look !== 'google' && <Del label={`${removeLabel(b)}: ${b.title}`} onClick={() => onRemove(b)} />}
       {moves && (
         <div
           className="resize"

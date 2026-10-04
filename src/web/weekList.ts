@@ -9,7 +9,7 @@ export interface WeekRow {
   /** "2pm", "End of day", or "Sometime". */
   time: string;
   text: string;
-  look: 'due' | 'class' | 'skipped' | 'event' | 'task' | 'sometime';
+  look: 'due' | 'class' | 'skipped' | 'event' | 'task' | 'sometime' | 'google';
   categoryId: string | null;
   done: boolean;
 }
@@ -32,12 +32,17 @@ export function weekRows(day: DaySchedule): WeekRow[] {
     const base = { key: x.id, at: x.startMin, time: fmtTime(x.startMin) };
     if (x.type === 'class') {
       out.push({ ...base, text: classTitle(x), look: x.skipped ? 'skipped' : 'class', categoryId: x.categoryId ?? 'class', done: false });
+    } else if (x.type === 'google') {
+      out.push({ ...base, text: x.title, look: 'google', categoryId: null, done: false });
     } else if (x.type === 'block' && x.kind !== 'open') {
       const text = x.kind === 'quick'
         ? `Quick things: ${x.items.map((i) => i.title).join(', ')}`
         : x.kind === 'task' ? x.title ?? 'Task' : `${x.title ?? 'Event'}${x.tentative ? ' (roughly)' : ''}`;
       out.push({ ...base, text, look: x.kind === 'task' || x.kind === 'quick' ? 'task' : 'event', categoryId: x.categoryId, done: x.done });
     }
+  }
+  for (const e of day.allDay) {
+    out.push({ key: `ad-${e.id}`, at: -1, time: 'All day', text: e.title, look: 'google', categoryId: null, done: false });
   }
   // A day-only deadline is already listed as due.
   for (const s of day.sometime.filter((x) => !x.due)) {

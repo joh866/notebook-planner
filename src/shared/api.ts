@@ -558,7 +558,30 @@ export interface QuickItemView {
   minutes: number;
 }
 
-export type ScheduleItem = ClassItem | RoutineItem | BlockItem;
+/** An event read from Google Calendar (spec §14). Shown in gray; it can't be moved or checked here. */
+export interface GoogleItem extends Placed {
+  type: 'google';
+  /** "calendarId|eventId". */
+  id: string;
+  title: string;
+  location: string | null;
+  /** The calendar's name. */
+  calendar: string;
+  /** Opens it in Google Calendar. */
+  link: string | null;
+  /** False for events marked "Free" in Google. The planner schedules over those. */
+  busy: boolean;
+}
+
+/** An all-day Google event on a day. It shows in the Sometime lane and the week's all-day row. */
+export interface GoogleAllDayView {
+  id: string;
+  title: string;
+  calendar: string;
+  link: string | null;
+}
+
+export type ScheduleItem = ClassItem | RoutineItem | BlockItem | GoogleItem;
 
 export interface DeadlineView {
   taskId: string;
@@ -603,6 +626,8 @@ export interface DaySchedule {
   schedule: ScheduleItem[];
   deadlines: DeadlineView[];
   sometime: SometimeView[];
+  /** All-day Google events (spec §14). */
+  allDay: GoogleAllDayView[];
 }
 
 interface ViewContext {
@@ -641,6 +666,8 @@ export interface MonthDay {
   /** Weekly routines that fall on the day. */
   chores: { routineId: string; title: string; categoryId: string | null }[];
   skippedClasses: ClassItem[];
+  /** Google events: timed ones with their start, all-day ones with none. */
+  google: { id: string; title: string; startMin: number | null }[];
 }
 
 export interface MonthView extends ViewContext {
@@ -680,6 +707,35 @@ export interface CanvasSync {
   updated: number;
   /** Assignments in the feed. */
   seen: number;
+  error: string | null;
+}
+
+/** GET /api/google: the Google Calendar connection (spec §14). Never includes a token. */
+export interface GoogleStatus {
+  /** The server has a Google client id and secret in .env. */
+  configured: boolean;
+  connected: boolean;
+  /** Connected, but Google stopped accepting the sign-in, so Connect again. */
+  expired: boolean;
+  email: string | null;
+  calendars: { id: string; name: string; on: boolean }[];
+  writeBack: boolean;
+  syncedAt: string | null;
+  note: string | null;
+}
+
+/** PATCH /api/google: which calendars to read, and whether to send planned blocks back. */
+export const GooglePatchSchema = z.strictObject({
+  calendars: z.record(z.string().min(1).max(500), z.boolean()).optional(),
+  writeBack: z.boolean().optional(),
+});
+
+/** POST /api/google/sync: what a sync did. */
+export interface GoogleSyncResult {
+  events: number;
+  calendars: number;
+  /** Blocks sent to, changed in, or removed from the Planner calendar. */
+  sent: number;
   error: string | null;
 }
 

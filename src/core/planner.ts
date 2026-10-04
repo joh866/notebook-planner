@@ -59,6 +59,9 @@ export function busyOf(schedule: ScheduleItem[], skip: Set<string> = new Set()):
       if (!it.skipped) out.push([it.startMin, it.endMin]);
     } else if (it.type === 'routine') {
       out.push(...handsOn(it.startMin, it.endMin, it.steps));
+    } else if (it.type === 'google') {
+      // Google events marked "Free" can be scheduled over (spec §14).
+      if (it.busy) out.push([it.startMin, it.endMin]);
     } else if (it.kind !== 'open' && !skip.has(it.id)) {
       out.push(...handsOn(it.startMin, it.endMin, it.steps));
     }

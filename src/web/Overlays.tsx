@@ -48,6 +48,10 @@ export function detailLines(b: Shown, day: DayView): string[] {
   } else if (item.type === 'routine') {
     if (item.changed) lines.push('Moved for this day only');
     for (const p of b.parts) lines.push(`${p.title}, ${p.endMin - p.startMin}m${p.waiting ? ', waiting' : ''}`);
+  } else if (item.type === 'google') {
+    if (item.location) lines.push(item.location);
+    lines.push(`From Google Calendar (${item.calendar}). Change it there.`);
+    if (!item.busy) lines.push('Marked free, so the planner can put things here.');
   } else {
     if (b.cond) lines.push(cap(b.cond));
     for (const x of item.items) lines.push(`${x.done ? '✓ ' : ''}${x.title}, ${x.minutes}m`);
@@ -137,7 +141,11 @@ export function Popover({ b, anchor, day, onCheck, onRemove, onPin, onStillOn, o
     }
   }
   if (item.type === 'block' && item.kind === 'task') acts.push({ label: item.pinned ? 'Unpin' : 'Pin here', run: () => onPin(b) });
-  acts.push({ label: removeLabel(b), run: () => onRemove(b) });
+  if (item.type !== 'google') acts.push({ label: removeLabel(b), run: () => onRemove(b) });
+  else if (item.link) {
+    const link = item.link;
+    acts.push({ label: 'Open in Google', run: () => window.open(link, '_blank', 'noopener') });
+  }
   if (item.type === 'class') acts.push({ label: 'Edit', run: () => onEditClass(item.classId) });
 
   return (

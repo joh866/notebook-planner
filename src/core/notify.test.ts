@@ -35,7 +35,7 @@ const laundry = (date: string, checked: string[] = []): RoutineItem => ({
 const due = (name: string, date: string, hhmm: string | null, done = false): DeadlineView => ({
   taskId: name, name, dueAt: hhmm ? iso(at(date, hhmm)) : null, dueDate: hhmm ? null : date, atMin: null, done,
 });
-const sched = (date: string, schedule: DaySchedule['schedule'] = [], deadlines: DeadlineView[] = []): DaySchedule => ({ date, schedule, deadlines, sometime: [] });
+const sched = (date: string, schedule: DaySchedule['schedule'] = [], deadlines: DeadlineView[] = []): DaySchedule => ({ date, schedule, deadlines, sometime: [], allDay: [] });
 
 function input(now: DateTime, day: DaySchedule, tomorrow: DaySchedule, more: Partial<NotifyInput> = {}): NotifyInput {
   return { now, zone: CHI, wakeTime: '09:00', bedTime: '00:00', on: ALL, day, tomorrow, checkIns: [], ...more };

@@ -39,8 +39,8 @@ export interface Geometry {
   nowMin: number | null;
 }
 
-/** Classes, skipped classes, and open time stay put. Everything else on the schedule moves and resizes. */
-export const movable = (b: Shown) => b.look !== 'class' && b.look !== 'skipped' && b.look !== 'open';
+/** Classes, skipped classes, open time, and Google events stay put. Everything else on the schedule moves and resizes. */
+export const movable = (b: Shown) => b.look !== 'class' && b.look !== 'skipped' && b.look !== 'open' && b.look !== 'google';
 
 const isTaskBlock = (b: Shown) => b.item.type === 'block' && b.item.kind === 'task';
 

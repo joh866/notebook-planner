@@ -18,6 +18,7 @@ import { Rail } from './Rail';
 import { Schedule, type Shown } from './Schedule';
 import { logMessage } from './logMessage';
 import { Settings } from './Settings';
+import { googleReturnMessage } from './settingsSheet';
 import { TimeLog } from './TimeLog';
 import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
 import { refreshPush } from './push';
@@ -34,6 +35,17 @@ function useNow(): DateTime {
 }
 
 let toastId = 0;
+
+/** Back from Google's sign-in (spec §14): what to say, read once from `?google=`, which is then taken off the address. */
+const googleReturn = (() => {
+  if (typeof window === 'undefined') return null;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('google')) return null;
+  const msg = googleReturnMessage(url.searchParams.get('google'));
+  url.searchParams.delete('google');
+  window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+  return msg;
+})();
 
 const PHONE_WEEK_KEY = 'planner.phoneWeek';
 /** Until one is picked (spec §8), the phone week is one day per row, with the time grid a tap away. */
@@ -60,9 +72,10 @@ export function App() {
   const [openId, setOpenId] = useState<string | null>(null);
   /** The class dialog: a class id to edit, or 'new'. */
   const [classEdit, setClassEdit] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Settings opens with the message, so the Google rows are right there.
+  const [settingsOpen, setSettingsOpen] = useState(!!googleReturn);
   const [timeLogOpen, setTimeLogOpen] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(() => (googleReturn ? { id: ++toastId, message: googleReturn, ms: 8000 } : null));
   /** Cards the add box just made, which flash briefly (spec §11, "After adding"). */
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
   const phone = usePhone();
@@ -288,6 +301,7 @@ export function App() {
         })(),
       }]);
     }
+    if (item.type === 'google') return;
     return change(() => api.deleteBlock(item.id), item.kind === 'task' || item.kind === 'quick' ? 'Back on your list.' : `Removed “${b.title}”.`);
   };
 
@@ -650,6 +664,7 @@ export function App() {
             closeSettings();
             setTimeLogOpen(true);
           }}
+          onReload={() => void reload()}
           onClose={closeSettings}
         />
       )}

@@ -122,6 +122,9 @@ button.box:hover { background:var(--hover); }
 .block.tentative { background:color-mix(in srgb, var(--cat) 9%, var(--card)); border:1.5px dashed var(--cat); }
 .block.open { background:repeating-linear-gradient(135deg, transparent 0 7px, var(--chip) 7px 8px); border:1px dashed var(--line); z-index:2; color:var(--muted); }
 .block.open .bt { font-weight:500; }
+/* Read from Google Calendar (spec §14): gray, and quieter than your own blocks. */
+.block.google { --cat:var(--c-none); color:var(--muted); }
+.block.google .bt { font-weight:600; }
 .block.skipped { background:transparent; border:1.5px dashed var(--muted); opacity:.6; }
 .block.skipped .tt { text-decoration:line-through; }
 .block.missed { box-shadow:inset 0 0 0 1.5px var(--red); }
@@ -177,6 +180,7 @@ button.box:hover { background:var(--hover); }
 .chip .from { font-size:11.5px; color:var(--red); }
 .chip.done span { text-decoration:line-through; color:var(--muted); }
 .chip.dragging { opacity:.35; }
+.chip.google { --cat:var(--c-none); color:var(--muted); cursor:pointer; padding-right:9px; text-decoration:none; }
 .chip .del { width:20px; height:20px; }
 .chip:hover .del { opacity:.75; }
 .card {
@@ -373,6 +377,7 @@ button.swatch:disabled { cursor:default; }
 .wk-ad .d { font-family:var(--font-h); font-size:calc(16px * var(--h-scale)); line-height:1.1; color:var(--red); }
 .wk-ad .s { font-size:11px; padding:1px 5px; border-radius:4px; background:color-mix(in srgb, var(--cat) var(--fill), var(--card)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wk-ad .s.done { opacity:.5; text-decoration:line-through; }
+.wk-ad .s.google, .wk-b.google, .mo-cell .ev.google { --cat:var(--c-none); color:var(--muted); }
 .wk-gut { position:sticky; left:0; z-index:3; background:var(--panel); }
 .wk-gut span { position:absolute; right:7px; transform:translateY(-50%); font-size:11px; color:var(--muted); white-space:nowrap; }
 .wk-col { position:relative; border-left:1px solid var(--line); cursor:pointer; min-width:0; }

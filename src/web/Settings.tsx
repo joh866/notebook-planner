@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react';
 import { DateTime } from 'luxon';
-import type { CanvasSync, CategoryView, SettingsView } from '../shared/api';
+import type { CanvasSync, CategoryView, GoogleStatus, SettingsView } from '../shared/api';
 import { partnerOf, themeById, THEMES, type ThemeId } from '../shared/themes';
 import { fmtTime } from './format';
 import { categoryName, catStyle, CUSTOM_COLORS, findCategory, nextColor } from './cats';
 import { classTitle } from './ClassDialog';
-import { api, auth, deviceZone, pushApi, type Changed, type ClassRow, type SettingsPatch } from './client';
+import { api, auth, deviceZone, googleApi, pushApi, type Changed, type ClassRow, type SettingsPatch } from './client';
 import { currentSubscription, pushSupport, turnOff, turnOn } from './push';
 import { XIcon } from './icons';
 import { TimePicker } from './TimePicker';
-import { clampDayTime, classLine, NOTIFY_ROWS, pushBlocker, pushTestMessage, zoneCity, zoneList } from './settingsSheet';
+import { clampDayTime, classLine, googleSyncMessage, NOTIFY_ROWS, pushBlocker, pushTestMessage, zoneCity, zoneList } from './settingsSheet';
 
 interface Props {
   settings: SettingsView;
@@ -24,10 +24,12 @@ interface Props {
   onDayTimes: () => void;
   /** Opens the time log (spec §13). */
   onTimeLog: () => void;
+  /** Reloads the schedule after a change made outside `change` (Google Calendar). */
+  onReload: () => void;
   onClose: () => void;
 }
 
-/** "today 2:15pm" or "Oct 3, 2:15pm" for the last Canvas check. */
+/** "today 2:15pm" or "Oct 3, 2:15pm" for the last Canvas check or Google sync. */
 function canvasWhen(at: string): string {
   const d = DateTime.fromISO(at).toLocal();
   const time = fmtTime(d.hour * 60 + d.minute);
@@ -135,6 +137,104 @@ function PushDevice({ say }: { say: (m: string) => void }) {
   );
 }
 
+/**
+ * Google Calendar (spec §14): Connect, which calendars to read, write-back to a "Planner" calendar,
+ * Sync now, and Disconnect. `onChanged` reloads the schedule, since Google events show on it.
+ */
+function GoogleRows({ say, onChanged }: { say: (m: string) => void; onChanged: () => void }) {
+  const [g, setG] = useState<GoogleStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    googleApi.status().then(setG, () => {});
+  }, []);
+  const act = async <T,>(run: () => Promise<T>, done: (r: T) => void) => {
+    setBusy(true);
+    try {
+      done(await run());
+      setG(await googleApi.status());
+      onChanged();
+    } catch (e) {
+      say(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const connect = () => window.location.assign('/api/google/connect');
+  if (!g) return null;
+
+  if (!g.connected || g.expired) {
+    return (
+      <div className="srow">
+        <div className="grow">
+          <div>Google Calendar</div>
+          <div className="sub2">
+            {!g.configured
+              ? 'Not set up on the server yet. The steps are in GOOGLE.md.'
+              : g.expired
+                ? 'Google ended the sign-in, so events aren’t updating. Connect again to pick up where it left off.'
+                : 'Show your Google events here, and optionally send planned blocks back to Google.'}
+          </div>
+        </div>
+        <button className="box boxbtn" disabled={!g.configured} onClick={connect}>
+          {g.expired ? 'Connect again' : 'Connect'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="srow">
+        <div className="grow">
+          <div>Google Calendar</div>
+          <div className="sub2">
+            Connected{g.email ? ` as ${g.email}` : ''}. {g.syncedAt ? `Synced ${canvasWhen(g.syncedAt)}: ${g.note ?? ''}.` : 'Not synced yet.'} It syncs again every 15 minutes.
+          </div>
+        </div>
+      </div>
+      {g.calendars.map((c) => (
+        <div className="srow" key={c.id}>
+          <button
+            className="cb"
+            role="checkbox"
+            aria-checked={c.on}
+            aria-label={`Show ${c.name}`}
+            disabled={busy}
+            onClick={() => void act(() => googleApi.update({ calendars: { [c.id]: !c.on } }), () => {})}
+          />
+          <div className="grow">{c.name}</div>
+        </div>
+      ))}
+      <div className="srow">
+        <button
+          className="cb"
+          role="checkbox"
+          aria-checked={g.writeBack}
+          aria-label="Send planned blocks to Google"
+          disabled={busy}
+          onClick={() => void act(
+            () => googleApi.update({ writeBack: !g.writeBack }),
+            () => say(g.writeBack ? 'Planned blocks are off the Planner calendar in Google.' : 'Planned blocks now go to a “Planner” calendar in Google.'),
+          )}
+        />
+        <div className="grow">
+          <div>Send planned blocks to Google</div>
+          <div className="sub2">Tasks, Quick things, and events you placed go to a “Planner” calendar, from yesterday to a month ahead.</div>
+        </div>
+      </div>
+      <div className="srow">
+        <span className="grow" />
+        <button className="box boxbtn" disabled={busy} onClick={() => void act(() => googleApi.sync(), (r) => say(googleSyncMessage(r, g.writeBack)))}>
+          Sync now
+        </button>
+        <button className="box boxbtn" disabled={busy} onClick={() => void act(() => googleApi.disconnect(), () => say('Google Calendar is disconnected. Its events are off the schedule.'))}>
+          Disconnect
+        </button>
+      </div>
+    </>
+  );
+}
+
 async function testNotification(say: (m: string) => void) {
   try {
     say(pushTestMessage(await pushApi.test()));
@@ -144,7 +244,7 @@ async function testNotification(say: (m: string) => void) {
 }
 
 /** The gear button's sheet (spec §13). Every change saves right away. */
-export function Settings({ settings: st, categories, covered, change, say, onEditClass, onDayTimes, onTimeLog, onClose }: Props) {
+export function Settings({ settings: st, categories, covered, change, say, onEditClass, onDayTimes, onTimeLog, onReload, onClose }: Props) {
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [canvas, setCanvas] = useState(st.canvasFeedUrl ?? '');
@@ -395,15 +495,7 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
 
         <section>
           <h3>Connections</h3>
-          <div className="srow">
-            <div className="grow">
-              <div>Google Calendar</div>
-              <div className="sub2">Show your Google events here, and send planned blocks back to Google.</div>
-            </div>
-            <button className="box boxbtn" onClick={() => say('Google Calendar comes in a later step.')}>
-              Connect
-            </button>
-          </div>
+          <GoogleRows say={say} onChanged={onReload} />
           <div className="srow wrap">
             <div className="full">
               <div>Canvas calendar feed</div>

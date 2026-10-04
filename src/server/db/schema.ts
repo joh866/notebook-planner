@@ -291,3 +291,61 @@ export const sentNotifications = sqliteTable('sent_notifications', {
   key: text('key').primaryKey(),
   sentAt: text('sent_at').notNull(),
 });
+
+/**
+ * The connected Google account (spec §14, "Google Calendar"). One row (id = 1) while connected. The
+ * refresh token is a secret: it stays on the server and is never sent to the browser or logged.
+ */
+export const googleAccount = sqliteTable('google_account', {
+  id: integer('id').primaryKey(),
+  /** Null once Google stops accepting it, until you connect again. */
+  refreshToken: text('refresh_token'),
+  email: text('email'),
+  /** Send planned blocks to the "Planner" calendar (off by default). */
+  writeBack: integer('write_back', { mode: 'boolean' }).notNull().default(false),
+  plannerCalendarId: text('planner_calendar_id'),
+  /** The last sync, and what it found or why it failed. */
+  syncedAt: text('synced_at'),
+  note: text('note'),
+  connectedAt: text('connected_at').notNull(),
+});
+
+/** Your Google calendars. Events are read from the ones that are on. */
+export const googleCalendars = sqliteTable('google_calendars', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  on: integer('on', { mode: 'boolean' }).notNull().default(false),
+  primary: integer('primary', { mode: 'boolean' }).notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+/**
+ * Events read from Google, by calendar and Google's event id, so a sync updates rather than
+ * duplicates. Timed events have UTC moments; all-day ones have days, with the end day not included.
+ */
+export const googleEvents = sqliteTable(
+  'google_events',
+  {
+    calendarId: text('calendar_id').notNull().references(() => googleCalendars.id, { onDelete: 'cascade' }),
+    eventId: text('event_id').notNull(),
+    title: text('title').notNull(),
+    location: text('location'),
+    link: text('link'),
+    busy: integer('busy', { mode: 'boolean' }).notNull().default(true),
+    startAt: text('start_at'),
+    endAt: text('end_at'),
+    startDate: text('start_date'),
+    endDate: text('end_date'),
+  },
+  (t) => [primaryKey({ columns: [t.calendarId, t.eventId] })],
+);
+
+/**
+ * Blocks sent to the Planner calendar: Google's event id and the body last sent, so only changes go
+ * out. Not tied to `blocks`, since a deleted block's event still has to be removed from Google.
+ */
+export const googlePushed = sqliteTable('google_pushed', {
+  blockId: text('block_id').primaryKey(),
+  eventId: text('event_id').notNull(),
+  sent: text('sent').notNull(),
+});

@@ -51,6 +51,12 @@ export function Month({ month, categories, phone, onOpenDay }: Props) {
                   {e.title ?? 'Event'}
                 </div>
               ))}
+              {d.google.map((g) => (
+                <div key={g.id} className="ev google">
+                  <i />
+                  {g.title}
+                </div>
+              ))}
               {d.chores.map((c) => (
                 <div key={c.routineId} className="ev quiet">{c.title}</div>
               ))}

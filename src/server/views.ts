@@ -2,6 +2,7 @@ import { DateTime } from 'luxon';
 import { addDays, dayOf, weekStartOf } from '../core/day';
 import { groupTasks } from '../core/groups';
 import { deadlineName } from '../core/classes';
+import { allDayOn } from '../core/google';
 import { blockLength, isQuick, quickLength } from '../core/length';
 import { loggedMinutes, sessionMinutes } from '../core/sessions';
 import { busyOf, capacity, freeWindow, type DayFree, type PlanClock, type PlanTask, type Prereq } from '../core/planner';
@@ -20,6 +21,8 @@ import type {
   DaySchedule,
   DayView,
   DeadlineView,
+  GoogleAllDayView,
+  GoogleItem,
   MonthDay,
   MonthView,
   RoutineItem,
@@ -58,6 +61,8 @@ function load(db: Db) {
     quickItems: db.select().from(t.quickItems).orderBy(t.quickItems.sortOrder).all(),
     sessions: db.select().from(t.taskSessions).orderBy(t.taskSessions.startAt).all(),
     feedItems: db.select().from(t.feedItems).all(),
+    googleCalendars: db.select().from(t.googleCalendars).all(),
+    googleEvents: db.select().from(t.googleEvents).all(),
   };
 }
 type Data = ReturnType<typeof load>;
@@ -233,6 +238,29 @@ function blockItems(ctx: Ctx, date: string): BlockItem[] {
   return ctx.data.blocks.filter((b) => dayOf(utc(b.startAt), ctx.zone) === date).map((b) => blockItem(ctx, b, date));
 }
 
+/** Google events from calendars that are on (spec §14). */
+function googleOn(ctx: Ctx) {
+  const names = new Map(ctx.data.googleCalendars.filter((c) => c.on).map((c) => [c.id, c.name]));
+  return ctx.data.googleEvents.flatMap((e) => (names.has(e.calendarId) ? [{ ...e, calendar: names.get(e.calendarId)!, id: `${e.calendarId}|${e.eventId}` }] : []));
+}
+
+/** Timed Google events starting on a day. */
+function googleItems(ctx: Ctx, date: string): GoogleItem[] {
+  return googleOn(ctx).flatMap((e) => {
+    if (!e.startAt || !e.endAt) return [];
+    const start = utc(e.startAt);
+    if (dayOf(start, ctx.zone) !== date) return [];
+    const startMin = minutesOnDay(start, date, ctx.zone);
+    return [{
+      type: 'google' as const, id: e.id, title: e.title, location: e.location, calendar: e.calendar, link: e.link, busy: e.busy,
+      startAt: e.startAt, startMin, endMin: Math.max(startMin + 15, minutesOnDay(utc(e.endAt), date, ctx.zone)),
+    }];
+  }).sort((a, b) => a.startMin - b.startMin);
+}
+
+const googleAllDay = (ctx: Ctx, date: string): GoogleAllDayView[] =>
+  googleOn(ctx).filter((e) => allDayOn(e, date)).map((e) => ({ id: e.id, title: e.title, calendar: e.calendar, link: e.link }));
+
 function deadlinesOn(ctx: Ctx, date: string): DeadlineView[] {
   return ctx.data.tasks
     .filter((task) => deadlineDay(task, ctx.zone) === date)
@@ -268,9 +296,9 @@ function laneFor(ctx: Ctx, date: string, schedule: ScheduleItem[]): SometimeView
 }
 
 function scheduleFor(ctx: Ctx, date: string): DaySchedule {
-  const schedule: ScheduleItem[] = [...classItems(ctx, date), ...routineItems(ctx, date), ...blockItems(ctx, date)]
+  const schedule: ScheduleItem[] = [...classItems(ctx, date), ...routineItems(ctx, date), ...blockItems(ctx, date), ...googleItems(ctx, date)]
     .sort((a, b) => a.startMin - b.startMin);
-  return { date, schedule, deadlines: deadlinesOn(ctx, date), sometime: laneFor(ctx, date, schedule) };
+  return { date, schedule, deadlines: deadlinesOn(ctx, date), sometime: laneFor(ctx, date, schedule), allDay: googleAllDay(ctx, date) };
 }
 
 function dailyRows(ctx: Ctx, date: string): DailyRow[] {
@@ -451,6 +479,10 @@ function monthDay(ctx: Ctx, date: string): MonthDay {
       .filter((r) => r.repeat === 'weekly' && routineOccursOn(r, date))
       .map((r) => ({ routineId: r.id, title: r.title, categoryId: r.categoryId })),
     skippedClasses: classItems(ctx, date).filter((c) => c.skipped),
+    google: [
+      ...googleAllDay(ctx, date).map((e) => ({ id: e.id, title: e.title, startMin: null })),
+      ...googleItems(ctx, date).map((e) => ({ id: e.id, title: e.title, startMin: e.startMin })),
+    ],
   };
 }
 

@@ -15,6 +15,7 @@ import { registerDrops } from './drops';
 import { autoPencil, registerPlan } from './plan';
 import { httpFeed, registerCanvas, type FetchFeed } from './canvas';
 import { registerChanges } from './changes';
+import { GoogleService, registerGoogle } from './google';
 import { registerPush, type SendPush } from './push';
 import { registerSessions } from './sessions';
 import { notFound, readBody, registerResources, type Run } from './resources';
@@ -34,13 +35,15 @@ export interface AppOptions {
   auth?: AuthConfig;
   /** Web push: the public key the browser needs, and how to send. Left out without push keys. */
   push?: { publicKey: string; send: SendPush };
+  /** Google Calendar (spec §14). Without one, Settings says it isn't set up. */
+  google?: GoogleService;
 }
 
 /**
  * The API. Reads take `?tz=` (the device's time zone), which is used when the time zone setting
  * is "auto". Without it, the home zone is used.
  */
-export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed, auth, push }: AppOptions) {
+export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed, auth, push, google = new GoogleService(db, undefined) }: AppOptions) {
   const app = new Hono();
 
   /** Runs a change in one transaction and keeps its inverse for Undo. */
@@ -69,6 +72,12 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
 
   // Before every other route, so nothing is readable without signing in.
   registerAuth(app, auth, () => now().toMillis());
+
+  // With write-back on, a change in the app goes out to Google a little later (spec §14).
+  app.use('/api/*', async (c, next) => {
+    await next();
+    if (c.req.method !== 'GET' && !c.req.path.startsWith('/api/google') && c.res.status < 400) google.soon();
+  });
 
   app.get('/api/health', (c) => c.json<Health>({ ok: true }));
 
@@ -112,6 +121,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   registerChanges(app, db, run, now);
   registerCanvas(app, db, run, now, fetchFeed);
   registerPush(app, db, now, push);
+  registerGoogle(app, google, auth?.secure ?? false);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {

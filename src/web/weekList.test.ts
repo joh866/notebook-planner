@@ -25,6 +25,7 @@ describe('weekRows', () => {
         { taskId: 'x', name: 'finished', dueAt: 'x', dueDate: null, atMin: 600, done: true },
       ],
       sometime: [{ taskId: 's', title: 'Shopping run', categoryId: 'errand', done: false, rolledFrom: null, minutes: 60, due: false }],
+      allDay: [],
     };
     expect(weekRows(day).map((r) => [r.time, r.text, r.look])).toEqual([
       ['9am', 'MATH 15300', 'skipped'],
@@ -40,6 +41,6 @@ describe('weekRows', () => {
   });
 
   it('is empty on a day with nothing on it', () => {
-    expect(weekRows({ date: '2026-10-03', schedule: [routine], deadlines: [], sometime: [] })).toEqual([]);
+    expect(weekRows({ date: '2026-10-03', schedule: [routine], deadlines: [], sometime: [], allDay: [] })).toEqual([]);
   });
 });

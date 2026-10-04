@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 16.
+None. Step 16 was the last one. The next steps come from the Backlog.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -196,7 +196,38 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - **DEPLOY.md** section 9 is the checklist for turning notifications on on each device.
   - **Tests:** new `core/notify.test.ts` (every kind and its time, switches, the 10-minute limit, done and checked items, new keys after a move, "if" and quick blocks, past deadlines, other zones) and `server/push.test.ts` (subscriptions, validation, sending once to every device, settings, the device's zone, gone devices, the test button, sign-in, `.env`), plus the settings messages. No existing test changed.
   - **Checked:** in the browser at 390px and desktop. Settings shows the not-set-up line and the test button's message on localhost. A real push can only be checked live.
-- [ ] **16. Google Calendar** (spec §14): sign-in and reading events first, then optional write-back.
+- [x] **16. Google Calendar** (spec §14): sign-in and reading events first, then optional write-back.
+
+  Notes:
+  - **`GOOGLE.md`** is the checklist for the user's part:
+    - the Cloud project, the Calendar API, and the sign-in screen,
+    - the two permissions, publishing (so sign-ins don't end after 7 days),
+    - the Web client with both redirect addresses, and the three `.env` lines on the droplet,
+    - then Connect.
+  - **Sign-in:** `GET /api/google/connect` goes to Google with a one-time state in a 10-minute cookie. `/api/google/callback` checks the state, keeps the refresh token in `google_account` (server only, never logged or sent), and syncs. The page comes back with `?google=…`, which shows a message and opens Settings.
+    - The redirect address comes from `GOOGLE_REDIRECT_URI`, or from the request (Caddy's `X-Forwarded-Proto` and host).
+    - A refresh Google refuses (`invalid_grant`) clears the token, and Settings offers Connect again. Disconnect takes write-back's events off, revokes the token, and removes the account, calendars, and events.
+  - **Reading:** `GoogleService` syncs on start, every 15 minutes, and on Sync now, one sync at a time.
+    - It keeps the calendar list. New calendars start on if they're the primary one or shown in Google's own list, and choices are kept after that.
+    - For each calendar that's on, it reads from 14 days back to 120 days ahead and replaces that calendar's events, keyed by calendar and event id. So a sync updates instead of duplicating.
+    - Turning a calendar off removes its events right away.
+    - `core/google.ts` turns Google's events into stored ones. Cancelled and declined events are left out, and "Free" ones aren't busy.
+  - **Showing:** a new `google` schedule item, gray, not draggable, with no checkbox or ×. Its popover has details and "Open in Google."
+    - All-day events go in `DaySchedule.allDay`, shown as chips in the Sometime lane and in the week's all-day row.
+    - `MonthDay.google` feeds the month grid, its dots, and Coming up. The phone week list has them too.
+    - `busyOf` counts busy ones, so the planner works around them. Notifications ignore them.
+  - **Write-back (off by default):** a checkbox in Settings.
+    - On: the server makes a "Planner" calendar, which it never reads. Then it sends task blocks, Quick things, and events from yesterday to 30 days ahead.
+    - `google_pushed` keeps each block's Google event id and the body last sent, so only changes go out. Blocks outside the window are left alone. A block deleted in the app is deleted in Google, and one deleted in Google is sent again when it changes.
+    - After any successful change in the app, it syncs 20 seconds later (one timer, reset by each change).
+    - Off: everything it sent is taken back off.
+  - **Schema:** migration `0011_google` adds `google_account`, `google_calendars`, `google_events`, and `google_pushed`. No new dependency, since Google is called with `fetch`.
+  - **Spec v0.7:** §13 and §14 updated, open question 4 decided, and a change log line added. `.env.example` has the three Google names.
+  - **Tests:**
+    - New `core/google.test.ts` covers reading events and the write-back plan.
+    - New `server/google.test.ts`, against a fake Google, covers: not set up, the state check, refused and bad codes, connecting, the calendar picks, the token never in a response, the day, week, and month views, planner busy time, syncing again, turning calendars off and on, an ended sign-in, disconnecting, and write-back (off until on, the Planner calendar not read, moves, removals, re-sending, only changes, the 20-second delay, turning it off).
+    - Existing tests: `core/notify.test.ts`, `web/agenda.test.ts`, and `web/weekList.test.ts` build days by hand, so their inputs got the new empty `allDay` or `google` lists. No expected result changed.
+  - **Checked:** in the browser at desktop width and 390px. On localhost, with no Google keys, Settings says it isn't set up, and `?google=not-set-up` shows its message and opens Settings. A real connection can only be checked once `GOOGLE.md` is done.
 - [x] **17. Canvas calendar feed.** Moved to 13f.
 
 ## Backlog

@@ -90,6 +90,7 @@ function itemNotes(items: ScheduleItem[], input: NotifyInput): Note[] {
     // A waiting part ending says what's next (spec §10, "Waiting time inside a task").
     const unfinished = x.type === 'routine' ? !x.checked : x.type === 'block' && !x.done;
     if (!unfinished) continue;
+    if (x.type === 'google') continue;
     const steps = x.type === 'routine'
       ? x.steps.map((s) => ({ ...s, done: s.checked }))
       : x.steps;

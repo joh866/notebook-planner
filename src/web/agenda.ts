@@ -31,6 +31,10 @@ export function agendaLines(day: MonthDay): AgendaLine[] {
       text: `${fmtTime(e.startMin)} ${e.title ?? 'Event'}${e.tentative ? ' (roughly)' : ''}`,
     });
   }
+  // Google events (spec §14): all-day ones first.
+  for (const g of day.google) {
+    out.push({ key: g.id, at: g.startMin ?? -1, due: false, categoryId: null, text: g.startMin == null ? g.title : `${fmtTime(g.startMin)} ${g.title}` });
+  }
   for (const c of day.skippedClasses) {
     out.push({ key: c.id, at: c.startMin, text: `Skipping ${classTitle(c)}`, due: false, categoryId: c.categoryId ?? 'class' });
   }
@@ -50,5 +54,6 @@ export function monthDots(day: MonthDay): { key: string; due: boolean; categoryI
   return [
     ...day.deadlines.filter((d) => !d.done).map((d) => ({ key: `due-${d.taskId}`, due: true, categoryId: null })),
     ...day.events.map((e) => ({ key: e.id, due: false, categoryId: e.categoryId })),
+    ...day.google.map((g) => ({ key: g.id, due: false, categoryId: null })),
   ].slice(0, 4);
 }

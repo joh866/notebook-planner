@@ -4,6 +4,8 @@ import type {
   AuthState,
   CategoryView,
   CanvasSync,
+  GoogleStatus,
+  GoogleSyncResult,
   ChangesResult,
   ConditionAnswer,
   LogResult,
@@ -52,6 +54,14 @@ export const auth = {
   state: () => send<AuthState>('GET', '/api/auth'),
   signIn: (password: string) => send<AuthState>('POST', '/api/auth/sign-in', { password }),
   signOut: () => send<AuthState>('POST', '/api/auth/sign-out'),
+};
+
+/** Google Calendar (spec §14). Connect is a page visit to /api/google/connect, which goes to Google's sign-in. */
+export const googleApi = {
+  status: () => send<GoogleStatus>('GET', '/api/google'),
+  update: (body: { calendars?: Record<string, boolean>; writeBack?: boolean }) => send<GoogleStatus>('PATCH', '/api/google', body),
+  sync: () => send<GoogleSyncResult>('POST', '/api/google/sync'),
+  disconnect: () => send<GoogleStatus>('POST', '/api/google/disconnect'),
 };
 
 /** Web push (spec §13). The subscription is this device's; the server keeps one per device. */

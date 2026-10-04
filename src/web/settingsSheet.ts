@@ -63,3 +63,22 @@ export function pushBlocker(support: 'ok' | 'install-first' | 'unsupported', pub
   if (support === 'unsupported') return 'This browser can’t get notifications.';
   return null;
 }
+
+/** What the page says after Google sends you back from Connect (`?google=` on the address). Null for anything else. */
+export function googleReturnMessage(code: string | null): string | null {
+  switch (code) {
+    case 'connected': return 'Google Calendar is connected. Your events show in gray.';
+    case 'sync-failed': return 'Google Calendar is connected, but the first sync didn’t work. Try Sync now in Settings.';
+    case 'denied': return 'Google Calendar wasn’t connected, since access wasn’t allowed.';
+    case 'failed': return 'Couldn’t connect Google Calendar. Try Connect again.';
+    case 'not-set-up': return 'Google Calendar isn’t set up on the server yet. The steps are in GOOGLE.md.';
+    default: return null;
+  }
+}
+
+/** What Sync now says. */
+export function googleSyncMessage(r: { events: number; calendars: number; sent: number; error: string | null }, writeBack: boolean): string {
+  if (r.error) return `Couldn’t sync Google Calendar: ${r.error}.`;
+  const n = (k: number, w: string) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  return `Synced ${n(r.events, 'event')} from ${n(r.calendars, 'calendar')}${writeBack ? `, and sent ${n(r.sent, 'change')} to the Planner calendar` : ''}.`;
+}
