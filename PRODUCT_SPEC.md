@@ -586,12 +586,13 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
   - Canvas calendar feed (paste the link).
 - **Notifications:** each one can be switched on or off. Plus a test button.
   - Before each class (10 minutes before).
-  - When a scheduled task starts.
-  - Deadlines (the evening before and the morning of).
-  - Morning summary.
-  - Plan tomorrow (an hour before bedtime).
-  - Check-in questions (at most once a day).
-  - When a waiting part ends ("Move your laundry to the dryer").
+  - When a scheduled task starts, including "Quick things" blocks. A timed "if" item asks "Still on?"
+  - Deadlines: at 7pm the evening before, and at the usual wake time on the day (leaving out any already past by then).
+  - Morning summary, 15 minutes after the usual wake time: classes, tasks planned, and what's due.
+  - Plan tomorrow (an hour before bedtime), with tomorrow's classes and deadlines.
+  - Check-in questions, at noon, only when there's one to answer (at most once a day).
+  - When a waiting part ends ("Laundry: Washing is done. Next: Move to the dryer.").
+  - Each device turns notifications on or off for itself. The switches above apply to every device.
 - **Sign out:** only online, where there's a sign-in (section 3).
 
 ## 14. Integrations
@@ -619,6 +620,8 @@ Personal access tokens are disabled for UChicago students, and OAuth needs a dev
 ### Notifications
 
 Web push to the installed app. On iPhone this requires adding the app to the home screen first.
+- The server checks every minute and sends each notification once, to every device that turned them on. One more than 10 minutes late (say, after a restart) is dropped.
+- Times follow the time zone setting. With "Automatic," they follow the zone of the device that last opened the app.
 
 ## 15. Lessons from the first attempt (keep)
 
@@ -705,6 +708,7 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 4, 2026:** v0.7. Notifications (§13, §14): the exact times of each kind, per-device on and off, and the time zone they follow.
 - **Oct 3, 2026:** v0.7. Going online (§3, step 14): one-person password sign-in that lasts 90 days per device, Sign out in Settings (§13), and DNS on Cloudflare as a DNS-only record with Caddy getting the certificate.
 - **Oct 3, 2026:** v0.7. A prerequisite inherits the deadline urgency of whatever waits on it (§12).
 - **Oct 3, 2026:** v0.7. Themes come in day and night pairs: Notebook, Sleek, Glass, Mono, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk, with exact values from the theme samples. Settings picks a day theme and a night theme separately, and a day theme pre-fills its partner. Six palettes come from Candela (MIT), so its license notice is in the repo.

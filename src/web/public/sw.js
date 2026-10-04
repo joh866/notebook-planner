@@ -1,7 +1,7 @@
 // The service worker that makes the planner installable (spec §3). It never stores planner data:
 // /api always goes to the server. The page itself is fetched fresh when online and kept as a
 // fallback, and the built files in /assets (named by their contents) are kept once fetched.
-// Step 15 adds web push here.
+// It also shows web push notifications (step 15) and opens the planner when one is tapped.
 
 const CACHE = 'planner-v1';
 
@@ -46,4 +46,36 @@ self.addEventListener('fetch', (event) => {
       })),
     );
   }
+});
+
+// A push from the server: { title, body, tag, url }. iPhone requires every push to show a notification.
+self.addEventListener('push', (event) => {
+  let data;
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Planner', {
+      body: data.body || '',
+      tag: data.tag,
+      data: { url: data.url || '/' },
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+    }),
+  );
+});
+
+// Tapping a notification opens the planner, or brings an open one forward.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const open = list.find((c) => new URL(c.url).origin === self.location.origin);
+      if (open) return open.focus();
+      return self.clients.openWindow(url);
+    }),
+  );
 });

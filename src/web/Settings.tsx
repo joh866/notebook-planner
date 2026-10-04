@@ -5,10 +5,11 @@ import { partnerOf, themeById, THEMES, type ThemeId } from '../shared/themes';
 import { fmtTime } from './format';
 import { categoryName, catStyle, CUSTOM_COLORS, findCategory, nextColor } from './cats';
 import { classTitle } from './ClassDialog';
-import { api, auth, deviceZone, type Changed, type ClassRow, type SettingsPatch } from './client';
+import { api, auth, deviceZone, pushApi, type Changed, type ClassRow, type SettingsPatch } from './client';
+import { currentSubscription, pushSupport, turnOff, turnOn } from './push';
 import { XIcon } from './icons';
 import { TimePicker } from './TimePicker';
-import { clampDayTime, classLine, NOTIFY_ROWS, zoneCity, zoneList } from './settingsSheet';
+import { clampDayTime, classLine, NOTIFY_ROWS, pushBlocker, pushTestMessage, zoneCity, zoneList } from './settingsSheet';
 
 interface Props {
   settings: SettingsView;
@@ -90,16 +91,55 @@ const knownZones = () => {
   return zonesCache;
 };
 
+/** Notifications on this device: on or off, or why they can't be (spec §13). */
+function PushDevice({ say }: { say: (m: string) => void }) {
+  const [publicKey, setPublicKey] = useState<string | null | undefined>(undefined);
+  const [on, setOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    pushApi.state().then((p) => setPublicKey(p.publicKey), () => setPublicKey(null));
+    currentSubscription().then((s) => setOn(!!s), () => {});
+  }, []);
+  if (publicKey === undefined) return null;
+  const blocker = pushBlocker(pushSupport(), publicKey);
+  if (blocker) return <p className="hint">{blocker}</p>;
+  const flip = async () => {
+    setBusy(true);
+    try {
+      if (on) {
+        await turnOff();
+        setOn(false);
+        say('Notifications are off on this device.');
+      } else {
+        const problem = await turnOn(publicKey!);
+        if (problem) return say(problem);
+        setOn(true);
+        say('Notifications are on for this device.');
+      }
+    } catch (e) {
+      say(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="srow">
+      <div className="grow">
+        <div>This device</div>
+        <div className="sub2">{on ? 'Notifications are on here.' : 'Notifications are off here.'}</div>
+      </div>
+      <button className="box boxbtn" disabled={busy} onClick={() => void flip()}>
+        {on ? 'Turn off' : 'Turn on'}
+      </button>
+    </div>
+  );
+}
+
 async function testNotification(say: (m: string) => void) {
-  if (!('Notification' in window)) return say('This browser can’t show notifications.');
   try {
-    let perm = Notification.permission;
-    if (perm === 'default') perm = await Notification.requestPermission();
-    if (perm !== 'granted') return say('Notifications are blocked for this site. Allow them in your browser’s site settings.');
-    new Notification('CHEM 10100 lecture in 10 minutes', { body: 'This is a test notification.' });
-    say('Sent. Check your notifications.');
-  } catch {
-    say('This browser can’t show notifications here. They’ll work once the app is installed.');
+    say(pushTestMessage(await pushApi.test()));
+  } catch (e) {
+    say(e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -394,7 +434,7 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
 
         <section>
           <h3>Notifications</h3>
-          <p className="hint">These start working once the app is online (a later step). Your choices are saved now.</p>
+          <PushDevice say={say} />
           {NOTIFY_ROWS.map((n) => (
             <div className="srow" key={n.key}>
               <button

@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 15.
+Step 16.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -166,7 +166,36 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
   - Removed the `server.host: '0.0.0.0'` dev workaround. Spec v0.7 change log updated (§3, §13).
   - Tests: new `src/server/auth.test.ts` covers hashing, tokens, env reading, `.env` editing, the API locked without a cookie, sign-in, renewal and expiry, the wrong-password limit, sign-out, open localhost, and static serving. No existing test changed. Checked by hand in the browser against a production build: the sign-in screen at 390px and desktop, a wrong password, sign-in, the service worker, a deep link, and Sign out.
   - **Live:** https://planner.getclearpages.com. The user signed in, added it to the phone's home screen, and tested the Backblaze B2 backup. From here on, every step ends with a commit, a push, and `npm run deploy`. The droplet's database is the real one, and only the deploy script touches it.
-- [ ] **15. Notifications** (spec §13 list) through web push.
+- [x] **15. Notifications** (spec §13 list) through web push.
+
+  Notes:
+  - **What's due:** `core/notify.ts` (pure) turns today's and tomorrow's schedules, the deadlines, and the check-ins into notifications, each with a time and a key. A moved block gets a new key, so it's sent again at its new time. `notesDue` keeps the ones due in the last 10 minutes.
+  - **Times** (spec §13, now exact):
+    - Classes: 10 minutes before.
+    - Task and "Quick things" starts: at the start.
+    - Waiting parts ending: when the next step is hands-on and not checked.
+    - Deadlines: 7pm the evening before, and at wake time.
+    - Morning summary: wake time + 15 minutes.
+    - Plan tomorrow: an hour before bedtime.
+    - Check-ins: at noon.
+  - **Server** (`src/server/push.ts`):
+    - Endpoints: `GET /api/push` (the public key and the device count), `PUT`/`DELETE /api/push/subscription`, and `POST /api/push/test`. All need sign-in, like the rest of `/api`.
+    - Every minute, `sendDue` sends what's due to every device. It marks each one sent first, in `sent_notifications` (pruned after 3 days), so a restart never sends one twice.
+    - A device whose push service answers 404 or 410 is forgotten. Other failures log only the status code, never the address.
+    - Times use the time zone setting, or, with Automatic, the zone of the device that opened the app last. The app sends its zone on every open.
+  - **Data:** migration `0010` adds `push_subscriptions` and `sent_notifications`. No existing table changed.
+  - **Keys:** the new dependency is `web-push`.
+    - `npm run push-keys` writes `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (plus `VAPID_SUBJECT`) into `.env`, only if they're missing, and prints nothing secret.
+    - `npm run deploy` runs it on the droplet, with the site's address as the subject.
+    - Without keys (localhost), Settings says notifications aren't set up.
+  - **Web:**
+    - `sw.js` shows pushes and opens or focuses the planner on a tap.
+    - `web/push.ts` handles turning on (permission, subscribe) and off, and refreshes the device's zone when the app opens.
+    - Settings: a This device row with Turn on or Turn off. On an iPhone outside the home screen app, it says to add the app to the Home Screen first.
+    - The test button now sends a real push to every device and says how many it reached.
+  - **DEPLOY.md** section 9 is the checklist for turning notifications on on each device.
+  - **Tests:** new `core/notify.test.ts` (every kind and its time, switches, the 10-minute limit, done and checked items, new keys after a move, "if" and quick blocks, past deadlines, other zones) and `server/push.test.ts` (subscriptions, validation, sending once to every device, settings, the device's zone, gone devices, the test button, sign-in, `.env`), plus the settings messages. No existing test changed.
+  - **Checked:** in the browser at 390px and desktop. Settings shows the not-set-up line and the test button's message on localhost. A real push can only be checked live.
 - [ ] **16. Google Calendar** (spec §14): sign-in and reading events first, then optional write-back.
 - [x] **17. Canvas calendar feed.** Moved to 13f.
 

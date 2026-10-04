@@ -253,6 +253,23 @@ journalctl -u planner-backup -n 20
 
 A device stays signed in for 90 days after you last used it.
 
+## 9. Turn on notifications (each device, in the app)
+
+The deploy makes the push keys on the droplet by itself, so nothing needs doing on the server.
+
+On each device that should get notifications:
+1. **iPhone:** open the planner **from the home screen icon** (not Safari). iPhone only allows notifications there.
+2. Tap the gear, then scroll to **Notifications**.
+3. Next to **This device**, tap **Turn on**, then **Allow** when asked.
+4. Tap **Send a test notification**. It should arrive within a few seconds.
+5. Switch off any kinds you don't want. These choices are shared by every device.
+
+If it says notifications are blocked:
+- **iPhone:** open Settings, then Notifications, then Planner, and turn on Allow Notifications.
+- **Mac or PC:** open the browser's site settings for the planner (the icon left of the address) and allow notifications.
+
+Then tap **Turn on** again.
+
 ## Updating
 
 Commit, then run (**Mac**):
@@ -266,9 +283,10 @@ The deploy does these steps in order:
 2. Copies the committed code.
 3. Installs packages, but only when `package-lock.json` changed.
 4. Builds the web app.
-5. Backs up the database.
-6. Restarts the app. New migrations run as it starts.
-7. Waits for the app to answer.
+5. Makes the push keys for notifications, the first time only.
+6. Backs up the database.
+7. Restarts the app. New migrations run as it starts.
+8. Waits for the app to answer.
 
 The installed phone app picks up the new version the next time it's opened.
 

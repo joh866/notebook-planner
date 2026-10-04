@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NotifySchema } from '../shared/schemas';
-import { clampDayTime, classLine, NOTIFY_ROWS, zoneCity, zoneList } from './settingsSheet';
+import { clampDayTime, classLine, NOTIFY_ROWS, pushBlocker, pushTestMessage, zoneCity, zoneList } from './settingsSheet';
 
 describe('settings sheet', () => {
   it('keeps wake and bed times in range', () => {
@@ -28,5 +28,21 @@ describe('settings sheet', () => {
     expect(classLine({ days: [5, 1, 3], start: '10:30', end: '11:20', location: 'Kent Chemical Laboratory 107' }))
       .toBe('Mon, Wed, and Fri, 10:30–11:20am, Kent 107');
     expect(classLine({ days: [2, 4], start: '12:30', end: '13:50', location: null })).toBe('Tue and Thu, 12:30–1:50pm');
+  });
+});
+
+describe('notification messages (spec §13)', () => {
+  it('says how the test went', () => {
+    expect(pushTestMessage({ sent: 0, failed: 0 })).toBe('No device has notifications on yet. Turn them on for this device first.');
+    expect(pushTestMessage({ sent: 1, failed: 0 })).toBe('Sent to 1 device. Check your notifications.');
+    expect(pushTestMessage({ sent: 2, failed: 1 })).toBe('Sent to 2 devices. Check your notifications. 1 device didn’t take it.');
+    expect(pushTestMessage({ sent: 0, failed: 1 })).toBe('It didn’t go through. 1 device didn’t take it.');
+  });
+
+  it('says why notifications can’t be turned on here', () => {
+    expect(pushBlocker('ok', 'key')).toBeNull();
+    expect(pushBlocker('ok', null)).toMatch(/aren’t set up on this server/);
+    expect(pushBlocker('install-first', 'key')).toMatch(/^On iPhone, add the planner to your Home Screen first/);
+    expect(pushBlocker('unsupported', 'key')).toBe('This browser can’t get notifications.');
   });
 });

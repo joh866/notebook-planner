@@ -48,3 +48,18 @@ export function classLine(c: { days: number[]; start: string; end: string; locat
   const loc = shortLoc(c.location);
   return `${days}, ${fmtRange(clockMin(c.start), clockMin(c.end))}${loc ? `, ${loc}` : ''}`;
 }
+
+/** What the test button says (spec §13). */
+export function pushTestMessage(r: { sent: number; failed: number }): string {
+  if (!r.sent && !r.failed) return 'No device has notifications on yet. Turn them on for this device first.';
+  const to = r.sent ? `Sent to ${r.sent} device${r.sent === 1 ? '' : 's'}. Check your notifications.` : 'It didn’t go through.';
+  return r.failed ? `${to} ${r.failed} device${r.failed === 1 ? '' : 's'} didn’t take it.` : to;
+}
+
+/** Why notifications can't be turned on here, or null when they can. */
+export function pushBlocker(support: 'ok' | 'install-first' | 'unsupported', publicKey: string | null): string | null {
+  if (!publicKey) return 'Notifications aren’t set up on this server. They work in the online app.';
+  if (support === 'install-first') return 'On iPhone, add the planner to your Home Screen first (Share, then Add to Home Screen). Then open it from there and turn notifications on.';
+  if (support === 'unsupported') return 'This browser can’t get notifications.';
+  return null;
+}

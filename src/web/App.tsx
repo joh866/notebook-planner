@@ -20,6 +20,7 @@ import { logMessage } from './logMessage';
 import { Settings } from './Settings';
 import { TimeLog } from './TimeLog';
 import { TaskPanel, WINDOW_LABEL, type TaskActions } from './TaskPanel';
+import { refreshPush } from './push';
 import { usePhone } from './usePhone';
 import { PhoneWeekChoice, Week, WeekList, type PhoneWeek } from './Week';
 
@@ -96,6 +97,11 @@ export function App() {
       },
     );
   }, [sel, view]);
+
+  // At start, tell the server this device's time zone for notifications (spec §13).
+  useEffect(() => {
+    void refreshPush().catch(() => undefined);
+  }, []);
 
   // At start, move unfinished tasks from past days to today (spec §10, "Rollover").
   const rolled = useRef(false);

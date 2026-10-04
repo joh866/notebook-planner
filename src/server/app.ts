@@ -15,6 +15,7 @@ import { registerDrops } from './drops';
 import { autoPencil, registerPlan } from './plan';
 import { httpFeed, registerCanvas, type FetchFeed } from './canvas';
 import { registerChanges } from './changes';
+import { registerPush, type SendPush } from './push';
 import { registerSessions } from './sessions';
 import { notFound, readBody, registerResources, type Run } from './resources';
 import { Change, UndoStore, applyUndo, findRows, whereKey } from './undo';
@@ -31,13 +32,15 @@ export interface AppOptions {
   fetchFeed?: FetchFeed;
   /** One-person sign-in. Left out on localhost and in most tests, which keeps the API open. */
   auth?: AuthConfig;
+  /** Web push: the public key the browser needs, and how to send. Left out without push keys. */
+  push?: { publicKey: string; send: SendPush };
 }
 
 /**
  * The API. Reads take `?tz=` (the device's time zone), which is used when the time zone setting
  * is "auto". Without it, the home zone is used.
  */
-export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed, auth }: AppOptions) {
+export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed, auth, push }: AppOptions) {
   const app = new Hono();
 
   /** Runs a change in one transaction and keeps its inverse for Undo. */
@@ -108,6 +111,7 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
   registerSessions(app, db, run, now);
   registerChanges(app, db, run, now);
   registerCanvas(app, db, run, now, fetchFeed);
+  registerPush(app, db, now, push);
 
   /** Moves unfinished tasks from past days to today's Sometime lane (spec §10). */
   app.post('/api/rollover', (c) => {

@@ -16,6 +16,8 @@ import type {
   DropResult,
   MonthView,
   PlanResult,
+  PushState,
+  PushTest,
   SettingsView,
   WeekView,
 } from '../shared/api';
@@ -50,6 +52,15 @@ export const auth = {
   state: () => send<AuthState>('GET', '/api/auth'),
   signIn: (password: string) => send<AuthState>('POST', '/api/auth/sign-in', { password }),
   signOut: () => send<AuthState>('POST', '/api/auth/sign-out'),
+};
+
+/** Web push (spec §13). The subscription is this device's; the server keeps one per device. */
+export const pushApi = {
+  state: () => send<PushState>('GET', '/api/push'),
+  subscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    send<PushState>('PUT', '/api/push/subscription', { endpoint: sub.endpoint, keys: sub.keys, zone: deviceZone() }),
+  unsubscribe: (endpoint: string) => send<PushState>('DELETE', '/api/push/subscription', { endpoint }),
+  test: () => send<PushTest>('POST', '/api/push/test'),
 };
 
 const tz = () => `tz=${encodeURIComponent(deviceZone())}`;

@@ -271,3 +271,23 @@ export const feedItems = sqliteTable('feed_items', {
   snapshot: text('snapshot', { mode: 'json' }).notNull().$type<{ title: string; meta: string | null; dueAt: string | null; dueDate: string | null }>(),
   lastSeenAt: text('last_seen_at').notNull(),
 });
+
+/**
+ * Devices that get notifications (spec §14, "Notifications"): one web push subscription each, by its
+ * push service address. `zone` is the device's time zone when it last opened the app, used when the
+ * time zone setting is "auto".
+ */
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  endpoint: text('endpoint').primaryKey(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  zone: text('zone').notNull(),
+  createdAt: createdAt(),
+  lastSeenAt: text('last_seen_at').notNull(),
+});
+
+/** Notifications already sent, by key, so none goes out twice (even after a restart). Old ones are pruned. */
+export const sentNotifications = sqliteTable('sent_notifications', {
+  key: text('key').primaryKey(),
+  sentAt: text('sent_at').notNull(),
+});

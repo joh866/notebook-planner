@@ -488,3 +488,16 @@ export function rolloverInputs(db: Db, now: DateTime, deviceZone?: string) {
     sometime: ctx.data.sometime,
   };
 }
+
+/**
+ * What notifications (spec §13) read: today's and tomorrow's schedules and the check-ins. `deviceZone`
+ * is the zone of the device that last opened the app, used when the time zone setting is "auto".
+ */
+export function notifyInputs(db: Db, now: DateTime, deviceZone?: string) {
+  const ctx = context(db, now, deviceZone);
+  const s = ctx.data.settings;
+  return {
+    now, zone: ctx.zone, wakeTime: s.wakeTime, bedTime: s.bedTime, on: s.notify,
+    day: scheduleFor(ctx, ctx.today), tomorrow: scheduleFor(ctx, addDays(ctx.today, 1)), checkIns: checkIns(ctx),
+  };
+}

@@ -23,7 +23,8 @@ rsync -az --delete \
   --exclude .env --exclude '.env.*' --exclude .DS_Store --exclude .claude \
   ./ "$host:notebook-planner/"
 
-ssh "$host" bash -s <<'REMOTE'
+# The site's address, for the push keys' contact (planner@planner.example.com → https://planner.example.com).
+ssh "$host" "SITE=https://${host#*@} bash -s" <<'REMOTE'
 set -euo pipefail
 cd ~/notebook-planner
 echo "== Installing"
@@ -39,6 +40,8 @@ if ! grep -q '^AUTH_PASSWORD_HASH=' .env 2>/dev/null; then
   echo "deploy: the code is in place, but sign-in isn't set up yet. Finish DEPLOY.md step 6, then run npm run deploy again." >&2
   exit 1
 fi
+# Push keys for notifications (step 15), made once. Making new ones would turn notifications off everywhere.
+npm run --silent push-keys -- "$SITE"
 echo "== Backing up the database before it restarts"
 npm run --silent db:backup
 echo "== Restarting"

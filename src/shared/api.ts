@@ -697,3 +697,28 @@ export interface AuthState {
   required: boolean;
   signedIn: boolean;
 }
+
+// ---------- Notifications (spec §13, §14) ----------
+
+/** PUT /api/push/subscription: this device's web push subscription, and its time zone. */
+export const PushSubscribeSchema = z.strictObject({
+  endpoint: z.url({ protocol: /^https$/ }).max(2000),
+  keys: z.strictObject({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
+  zone: ZoneSchema,
+});
+
+/** DELETE /api/push/subscription: stop notifications on this device. */
+export const PushUnsubscribeSchema = z.strictObject({ endpoint: z.string().min(1).max(2000) });
+
+/** GET /api/push. `publicKey` is null when the server has no push keys (localhost without `npm run push-keys`). */
+export interface PushState {
+  publicKey: string | null;
+  /** Devices that get notifications. */
+  devices: number;
+}
+
+/** POST /api/push/test. */
+export interface PushTest {
+  sent: number;
+  failed: number;
+}
