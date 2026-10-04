@@ -15,7 +15,11 @@
     "seed": "tsx src/server/db/seed-cli.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "tsx src/server/db/check-cli.ts",
-    "db:repair": "tsx src/server/db/repair-cli.ts"
+    "db:repair": "tsx src/server/db/repair-cli.ts",
+    "start": "NODE_ENV=production tsx src/server/index.ts",
+    "set-password": "tsx src/server/set-password-cli.ts",
+    "db:backup": "tsx src/server/db/backup-cli.ts",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

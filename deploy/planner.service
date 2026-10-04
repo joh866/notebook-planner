@@ -1,0 +1,22 @@
+# The planner app (step 14). It starts when the droplet boots and restarts if it stops.
+[Unit]
+Description=Planner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=planner
+WorkingDirectory=/home/planner/notebook-planner
+Environment=NODE_ENV=production
+ExecStart=/home/planner/notebook-planner/node_modules/.bin/tsx src/server/index.ts
+Restart=always
+RestartSec=3
+# Only data/ is writable, and the app can't gain privileges.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/planner/notebook-planner/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

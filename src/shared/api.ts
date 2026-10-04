@@ -691,3 +691,9 @@ export interface CategoryView {
   builtin: boolean;
   sortOrder: number;
 }
+
+/** GET /api/auth (spec §3). `required` is false on localhost without a password set. */
+export interface AuthState {
+  required: boolean;
+  signedIn: boolean;
+}

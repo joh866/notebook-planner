@@ -14,6 +14,11 @@ export default tseslint.config(
     rules: { ...reactHooks.configs.recommended.rules },
   },
   {
+    // The service worker runs in its own scope (step 14).
+    files: ['src/web/public/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     // src/core stays pure: no server, web, or database imports.
     files: ['src/core/**/*.ts'],
     rules: {

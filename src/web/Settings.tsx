@@ -5,7 +5,7 @@ import { partnerOf, themeById, THEMES, type ThemeId } from '../shared/themes';
 import { fmtTime } from './format';
 import { categoryName, catStyle, CUSTOM_COLORS, findCategory, nextColor } from './cats';
 import { classTitle } from './ClassDialog';
-import { api, deviceZone, type Changed, type ClassRow, type SettingsPatch } from './client';
+import { api, auth, deviceZone, type Changed, type ClassRow, type SettingsPatch } from './client';
 import { XIcon } from './icons';
 import { TimePicker } from './TimePicker';
 import { clampDayTime, classLine, NOTIFY_ROWS, zoneCity, zoneList } from './settingsSheet';
@@ -114,7 +114,22 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
     setCanvas(st.canvasFeedUrl ?? '');
   }
   const [newCat, setNewCat] = useState('');
+  /** Sign out shows only when the server has a sign-in (spec §3). */
+  const [signedIn, setSignedIn] = useState(false);
   const sheet = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    auth.state().then((a) => setSignedIn(a.required && a.signedIn), () => {});
+  }, []);
+
+  const signOut = async () => {
+    try {
+      await auth.signOut();
+      window.location.reload();
+    } catch (e) {
+      say(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   // Classes and counts change elsewhere too, so they're fetched again whenever the app reloads.
   useEffect(() => {
@@ -401,6 +416,16 @@ export function Settings({ settings: st, categories, covered, change, say, onEdi
             </button>
           </div>
         </section>
+
+        {signedIn && (
+          <section>
+            <h3>Sign out</h3>
+            <div className="srow">
+              <span className="grow sub2">This device will need the password again.</span>
+              <button className="box boxbtn" onClick={() => void signOut()}>Sign out</button>
+            </div>
+          </section>
+        )}
       </aside>
     </div>
   );

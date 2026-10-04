@@ -1,0 +1,11 @@
+# One backup of the planner's database, copied off the droplet. Run nightly by planner-backup.timer.
+[Unit]
+Description=Planner nightly backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=planner
+WorkingDirectory=/home/planner/notebook-planner
+ExecStart=/bin/bash deploy/backup.sh

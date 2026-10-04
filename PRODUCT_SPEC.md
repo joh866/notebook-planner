@@ -61,7 +61,8 @@ The engineering practices were good and are worth keeping (section 15).
   - HTTPS with a domain name, which is required for installing the app and for notifications.
   - The app runs as a service that restarts on its own.
   - The SQLite file lives on the droplet and is backed up nightly somewhere off the droplet.
-  - One-person sign-in.
+  - One-person sign-in with a password, which the server keeps only as a hash. A device stays signed in for 90 days after it was last used, and Settings has Sign out. After five wrong passwords, that address waits 15 minutes. On localhost with no password set, there's no sign-in.
+  - The steps are in `DEPLOY.md`. The subdomain's DNS is on Cloudflare as a DNS-only record (gray cloud), so Caddy gets the certificate itself.
 - **"An app":** the web app installed to the phone's home screen. It gets an icon, opens full screen, and can send notifications. An App Store app isn't needed. It could be wrapped later if ever wanted.
 
 ## 4. Visual design: Notebook
@@ -591,6 +592,7 @@ When on, a new task in Today or tomorrow, This week, or Overdue is penciled into
   - Plan tomorrow (an hour before bedtime).
   - Check-in questions (at most once a day).
   - When a waiting part ends ("Move your laundry to the dryer").
+- **Sign out:** only online, where there's a sign-in (section 3).
 
 ## 14. Integrations
 
@@ -703,6 +705,7 @@ Native App Store apps, a writing feature for internship applications, two-way Ca
 - **Sep 25, 2026:** v0.1 (first attempt).
 - **Oct 2, 2026:** v0.2. Rewritten from the brainstorm and prototypes 1–6.
 - **Oct 2, 2026:** v0.3. Second-year student. Time zone setting and travel behavior. Tech stack decided.
+- **Oct 3, 2026:** v0.7. Going online (§3, step 14): one-person password sign-in that lasts 90 days per device, Sign out in Settings (§13), and DNS on Cloudflare as a DNS-only record with Caddy getting the certificate.
 - **Oct 9, 2026:** v0.7. A prerequisite inherits the deadline urgency of whatever waits on it (§12).
 - **Oct 9, 2026:** v0.7. Themes come in day and night pairs: Notebook, Sleek, Glass, Mono, Sepia Paper with Hearth Dusk, Solarized Lite with Ember, and Ink & Coral with Harbor Dusk, with exact values from the theme samples. Settings picks a day theme and a night theme separately, and a day theme pre-fills its partner. Six palettes come from Candela (MIT), so its license notice is in the repo.
 - **Oct 9, 2026:** v0.6. Themes: Notebook and Sleek. Conditions use look C.

@@ -1,0 +1,13 @@
+# The planner's web server (step 14). Caddy gets and renews the HTTPS certificate on its own and
+# passes requests to the app, which only listens on this machine. setup-server.sh puts the real
+# address in place of DOMAIN.
+DOMAIN {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8787
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+}

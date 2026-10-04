@@ -1,7 +1,7 @@
 # PROGRESS.md
 
 ## Current step
-Step 14.
+Step 15.
 
 ## How to run a step
 In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do the current step." Use plan mode, and read the plan before approving it. When the step works, commit it, then run `/clear` before starting the next one.
@@ -128,7 +128,7 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
 
 ## Part 2: online
 
-- [ ] **14. Go online on a DigitalOcean droplet** (spec §3).
+- [x] **14. Go online on a DigitalOcean droplet** (spec §3).
   - First, write `DEPLOY.md` with the exact steps the user does by hand: create the droplet, get a domain and point it at the droplet, and put `.env` on the server.
   - Then set up:
     - HTTPS with Caddy, which gets certificates automatically.
@@ -138,6 +138,33 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
     - A sign-in for one person.
   - Make the app installable on the phone's home screen (manifest, icons, service worker).
   - Remove the `server.host` workaround from the Backlog.
+
+  Notes:
+  - **`DEPLOY.md`** covers the droplet, the Cloudflare A record for the `planner` subdomain (DNS only, gray cloud, so Caddy gets the certificate), the first deploy, copying the database and `.env`, the password, the Backblaze B2 backup, the phone, updating, troubleshooting, and restoring.
+  - **Server setup:** `deploy/setup-server.sh` runs once as root. It installs Node 22, Caddy, and rclone; adds swap and a firewall; makes a `planner` user; and installs these files from `deploy/`:
+    - `planner.service`, which restarts on its own and can only write to `data/`.
+    - `planner-backup.service` and `planner-backup.timer`, every night at 3:30 AM Chicago.
+    - The Caddyfile.
+    - A sudoers rule that allows only `systemctl restart planner`.
+  - **The app online:** in production, the server serves `dist/` with an index.html fallback. It listens on 127.0.0.1 only, and refuses to start without sign-in set up. The Vite proxy now targets 127.0.0.1.
+  - **Sign-in** (`src/server/auth.ts`):
+    - A scrypt password hash plus an HMAC-signed, HTTP-only, SameSite=Lax cookie, Secure in production. Nothing goes in the database, so there's no schema change.
+    - A device stays signed in for 90 days, renewed daily while it's in use.
+    - After 5 wrong tries, that address waits 15 minutes.
+    - `npm run set-password` writes `AUTH_PASSWORD_HASH` and `SESSION_SECRET` into `.env` without printing them.
+    - Without those settings (localhost), the API stays open.
+    - The web app shows a sign-in screen (`SignIn.tsx`) and has Sign out in Settings.
+  - **Deploy:** `npm run deploy` (`scripts/deploy.sh`) does these steps in order:
+    - Refuses uncommitted changes, then runs `npm run check`.
+    - Copies the code to `DEPLOY_HOST` with rsync.
+    - Runs `npm ci` only when the lock file changed.
+    - Builds, backs up the database (`npm run db:backup`), restarts, and waits for /api/health.
+  - **Backups:** `npm run db:backup` copies the database with SQLite's online backup to `data/backups/auto-*.db` and checks the copy. It keeps 14 days of these locally. `deploy/backup.sh` then copies `data/backups` to `BACKUP_REMOTE` with rclone.
+  - **Installable:** a manifest, icons (192, 512, maskable 512, a 180 Apple touch icon, and a favicon), and `sw.js`, registered only in the built app.
+    - The service worker never caches /api. It fetches the page fresh, falling back to a cached copy, and keeps the content-hashed assets.
+    - The status bar color follows the theme.
+  - Removed the `server.host: '0.0.0.0'` dev workaround. Spec v0.7 change log updated (§3, §13).
+  - Tests: new `src/server/auth.test.ts` covers hashing, tokens, env reading, `.env` editing, the API locked without a cookie, sign-in, renewal and expiry, the wrong-password limit, sign-out, open localhost, and static serving. No existing test changed. Checked by hand in the browser against a production build: the sign-in screen at 390px and desktop, a wrong password, sign-in, the service worker, a deep link, and Sign out.
 - [ ] **15. Notifications** (spec §13 list) through web push.
 - [ ] **16. Google Calendar** (spec §14): sign-in and reading events first, then optional write-back.
 - [x] **17. Canvas calendar feed.** Moved to 13f.
@@ -145,7 +172,6 @@ In Claude Code, from this folder, say: "Read AGENTS.md and PROGRESS.md, then do 
 ## Backlog
 Ideas and annoyances from using the app. Add them here. Don't fix them in the middle of another step.
 - Re-planning a day forgets that a task was picked for it: placing a task takes it out of the Sometime lane, so when Plan lifts its penciled block again, it no longer gets "You picked this day for it" (+200). Found in step 13h.
-- Temporary: `vite.config.ts` sets `server.host: '0.0.0.0'` so the phone can open the dev server on the same Wi-Fi (Mac's IP, port 5173). There's no sign-in, so anyone on that network can read and edit the planner. Remove it in step 14, once the app is online with a sign-in.
 
 ## Notes
 Agents add short notes here when a step is done.

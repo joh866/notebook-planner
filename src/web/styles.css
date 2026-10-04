@@ -326,6 +326,16 @@ button.swatch:disabled { cursor:default; }
 .segc button[aria-pressed="true"] { background:var(--hl); font-weight:700; }
 @media (max-width:700px) { .sheet { border-left:0; } }
 
+/* ---------- Sign-in (spec §3) ---------- */
+.signin { min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:24px 20px; }
+.signin-card { width:min(360px, 100%); display:flex; flex-direction:column; gap:8px; padding:22px 22px 24px; border-radius:var(--r-panel); }
+.signin-card h1 { font-family:var(--font-h); font-size:calc(44px * var(--h-scale)); line-height:1; margin-bottom:8px; }
+.signin-card label { font-size:14px; color:var(--muted); }
+.signin-card input { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-card); padding:9px 10px; font-size:16px; }
+.signin-card .boxbtn { font-family:var(--font-h); font-size:calc(22px * var(--h-scale)); font-weight:600; height:40px; margin-top:6px; }
+.signin-card .boxbtn:disabled { opacity:.55; cursor:default; }
+.signin-error { color:var(--red); font-size:14px; }
+
 /* ---------- Left rail (screens 1400px and wider) ---------- */
 .rail { display:none; }
 @media (min-width:1400px) {

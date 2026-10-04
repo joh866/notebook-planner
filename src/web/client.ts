@@ -1,6 +1,7 @@
 import type {
   AddResult,
   AgendaView,
+  AuthState,
   CategoryView,
   CanvasSync,
   ChangesResult,
@@ -27,18 +28,29 @@ export type SettingsPatch = Partial<Omit<SettingsView, 'notify'>> & { notify?: P
 /** The device's time zone, used when the time zone setting is "auto". */
 export const deviceZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+/** Sent on window when the server says the sign-in ran out, so the sign-in screen comes back. */
+export const SIGNED_OUT = 'planner:signed-out';
+
 async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method,
     headers: body === undefined ? {} : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  if (res.status === 401 && !path.startsWith('/api/auth')) window.dispatchEvent(new Event(SIGNED_OUT));
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(err?.error ?? `${method} ${path} failed (${res.status})`);
   }
   return (await res.json()) as T;
 }
+
+/** One-person sign-in (spec §3). */
+export const auth = {
+  state: () => send<AuthState>('GET', '/api/auth'),
+  signIn: (password: string) => send<AuthState>('POST', '/api/auth/sign-in', { password }),
+  signOut: () => send<AuthState>('POST', '/api/auth/sign-out'),
+};
 
 const tz = () => `tz=${encodeURIComponent(deviceZone())}`;
 

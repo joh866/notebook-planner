@@ -8,6 +8,7 @@ import type { Health } from '../shared/schemas';
 import type { Db } from './db/client';
 import * as t from './db/schema';
 import { registerAdds } from './adds';
+import { registerAuth, type AuthConfig } from './auth';
 import { anthropicSorter, type SortChunk } from './ai';
 import { registerAnswers } from './answers';
 import { registerDrops } from './drops';
@@ -28,13 +29,15 @@ export interface AppOptions {
   sort?: SortChunk;
   /** Gets the Canvas feed. Tests pass a saved sample. */
   fetchFeed?: FetchFeed;
+  /** One-person sign-in. Left out on localhost and in most tests, which keeps the API open. */
+  auth?: AuthConfig;
 }
 
 /**
  * The API. Reads take `?tz=` (the device's time zone), which is used when the time zone setting
  * is "auto". Without it, the home zone is used.
  */
-export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed }: AppOptions) {
+export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore(), sort = anthropicSorter(), fetchFeed = httpFeed, auth }: AppOptions) {
   const app = new Hono();
 
   /** Runs a change in one transaction and keeps its inverse for Undo. */
@@ -60,6 +63,9 @@ export function createApp({ db, now = () => DateTime.utc(), undo = new UndoStore
     console.error(err);
     return c.json({ error: 'Something went wrong' }, 500);
   });
+
+  // Before every other route, so nothing is readable without signing in.
+  registerAuth(app, auth, () => now().toMillis());
 
   app.get('/api/health', (c) => c.json<Health>({ ok: true }));
 

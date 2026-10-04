@@ -141,6 +141,9 @@ export function App() {
   useEffect(() => {
     document.body.dataset.mode = look;
     document.body.dataset.theme = theme;
+    // The installed app's status bar takes the theme's background.
+    const bg = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+    if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
   }, [look, theme]);
 
   // The 60-second reload picks up the new day after 4am.
